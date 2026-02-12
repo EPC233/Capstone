@@ -1,0 +1,9 @@
+[flake8]
+# Black allos for 88 chars per line. Let's make flake8 do that too!
+max-line-length = 88
+
+# some flake8 errors to ignore (b/c Black says they're OK):
+ignore = W291, W293, W503 
+
+exclude =
+    .venv

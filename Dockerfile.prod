@@ -1,0 +1,73 @@
+# Combined Production Dockerfile for Railway
+# Builds both frontend and backend, serves them together
+
+# Stage 1: Build Frontend
+FROM node:20-slim as frontend-builder
+
+WORKDIR /app/frontend
+
+# Accept VITE_API_URL as build argument (defaults to empty string for production)
+ARG VITE_API_URL=""
+ENV VITE_API_URL=$VITE_API_URL
+
+# Copy frontend package files
+COPY ui/package.json ./
+
+# Install dependencies
+RUN npm install --production=false && \
+    npm install @rollup/rollup-linux-x64-gnu --save-optional || true
+
+# Copy frontend source code
+COPY ui/ ./
+
+# Build the React app
+RUN npm run build
+
+# Stage 2: Build Backend Dependencies
+FROM python:3.11-slim as backend-builder
+
+WORKDIR /app
+
+# Install Poetry
+RUN pip install --no-cache-dir poetry
+
+# Configure Poetry
+RUN poetry config virtualenvs.create false
+
+# Copy backend dependency files
+COPY backend/pyproject.toml backend/poetry.lock* ./
+
+# Install dependencies (production only)
+RUN poetry install --no-interaction --no-ansi --only=main --no-root
+
+# Stage 3: Final Runtime Image
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy installed Python packages and binaries from builder
+COPY --from=backend-builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=backend-builder /usr/local/bin /usr/local/bin
+
+# Copy backend application code
+COPY backend/ ./backend/
+
+# Copy built frontend from frontend-builder to /app/static
+COPY --from=frontend-builder /app/frontend/dist ./static
+
+# Create non-root user for security
+RUN useradd -m -u 1000 appuser && \
+    chown -R appuser:appuser /app
+
+USER appuser
+
+# Expose port (Railway sets PORT automatically)
+EXPOSE 8080
+
+# Use PORT environment variable if set, otherwise default to 8080
+ENV PORT=8080
+
+# Change to backend directory and run server
+WORKDIR /app/backend
+CMD sh -c "uvicorn server:app --host 0.0.0.0 --port \${PORT:-8080}"
+
