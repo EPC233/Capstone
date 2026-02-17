@@ -134,9 +134,6 @@ async def register(
         email_verified=True,  # Email verification disabled in starter code
         first_name=user_data.first_name,
         last_name=user_data.last_name,
-        child_name=user_data.child_name,
-        child_sex_assigned_at_birth=user_data.child_sex_assigned_at_birth,
-        child_dob=user_data.child_dob,
         avatar_url=user_data.avatar_url,
     )
 
@@ -343,11 +340,6 @@ async def update_user_profile(
     current_user: User = Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Update a user's profile fields (first_name, last_name, child_name, etc.).
-
-    Requires admin role.
-    """
     # Get the user to update
     user = await get_user_by_id(user_id, db)
     if not user:
@@ -364,22 +356,6 @@ async def update_user_profile(
     if profile_data.last_name is not None:
         user.last_name = (
             profile_data.last_name.strip() if profile_data.last_name else None
-        )
-    if profile_data.child_name is not None:
-        user.child_name = (
-            profile_data.child_name.strip() if profile_data.child_name else None
-        )
-    if profile_data.child_sex_assigned_at_birth is not None:
-        user.child_sex_assigned_at_birth = (
-            profile_data.child_sex_assigned_at_birth.strip()
-            if profile_data.child_sex_assigned_at_birth
-            else None
-        )
-    if profile_data.child_dob is not None:
-        user.child_dob = profile_data.child_dob
-    if profile_data.avatar_url is not None:
-        user.avatar_url = (
-            profile_data.avatar_url.strip() if profile_data.avatar_url else None
         )
 
     await db.commit()

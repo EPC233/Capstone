@@ -163,12 +163,8 @@ async def create_user(
         hashed_password=hashed_password,
         role_id=role.id,
         email_verified=True,  # Admin-created users are auto-verified
-        is_active=True,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
-        child_name=user_data.child_name,
-        child_sex_assigned_at_birth=user_data.child_sex_assigned_at_birth,
-        child_dob=user_data.child_dob,
         avatar_url=user_data.avatar_url,
     )
 
@@ -215,22 +211,6 @@ async def update_user(
     if profile_data.last_name is not None:
         user.last_name = (
             profile_data.last_name.strip() if profile_data.last_name else None
-        )
-    if profile_data.child_name is not None:
-        user.child_name = (
-            profile_data.child_name.strip() if profile_data.child_name else None
-        )
-    if profile_data.child_sex_assigned_at_birth is not None:
-        user.child_sex_assigned_at_birth = (
-            profile_data.child_sex_assigned_at_birth.strip()
-            if profile_data.child_sex_assigned_at_birth
-            else None
-        )
-    if profile_data.child_dob is not None:
-        user.child_dob = profile_data.child_dob
-    if profile_data.avatar_url is not None:
-        user.avatar_url = (
-            profile_data.avatar_url.strip() if profile_data.avatar_url else None
         )
 
     await db.commit()

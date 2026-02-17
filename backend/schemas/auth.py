@@ -15,9 +15,6 @@ class UserBase(BaseModel):
     email: EmailStr
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    child_name: Optional[str] = None
-    child_sex_assigned_at_birth: Optional[str] = None
-    child_dob: Optional[date] = None
     avatar_url: Optional[str] = None
 
 
@@ -92,9 +89,6 @@ class UserProfileUpdate(BaseModel):
 
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    child_name: Optional[str] = None
-    child_sex_assigned_at_birth: Optional[str] = None
-    child_dob: Optional[date] = None
     avatar_url: Optional[str] = None
 
 
