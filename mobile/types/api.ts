@@ -1,11 +1,3 @@
-/**
- * Type definitions for API responses and requests
- * Based on backend Pydantic schemas
- */
-
-// ============================================================================
-// Common Types
-// ============================================================================
 
 export interface Role {
     id: number;
@@ -13,23 +5,12 @@ export interface Role {
     description?: string | null;
 }
 
-// ============================================================================
-// Auth Types
-// ============================================================================
-
 export interface User {
     id: number;
     username: string;
     email: string;
     first_name?: string | null;
     last_name?: string | null;
-    child_name?: string | null;
-    child_sex_assigned_at_birth?: string | null;
-    child_dob?: string | null; // ISO date string
-    avatar_url?: string | null;
-    role: Role;
-    email_verified: boolean;
-    is_active: boolean;
     created_at: string; // ISO datetime string
     updated_at: string; // ISO datetime string
 }
@@ -46,92 +27,5 @@ export interface UserCreate {
     role?: string;
     first_name?: string | null;
     last_name?: string | null;
-    child_name?: string | null;
-    child_sex_assigned_at_birth?: string | null;
-    child_dob?: string | null;
     avatar_url?: string | null;
 }
-
-// ============================================================================
-// Course Types
-// ============================================================================
-
-export interface Course {
-    id: number;
-    title: string;
-    description?: string | null;
-    file_url?: string | null;
-    module_count?: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface Module {
-    module_id: number;
-    module_title: string;
-    module_description?: string | null;
-    module_color?: string | null;
-    ordering: number;
-    course_id: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface Post {
-    id: number;
-    title: string;
-    content?: string | null;
-    post_type: string;
-    module_id: number;
-    ordering: number;
-    created_at: string;
-    updated_at: string;
-}
-
-export interface CourseDetail extends Course {
-    modules?: Module[];
-}
-
-// ============================================================================
-// Group Types
-// ============================================================================
-
-export interface GroupMember {
-    user_id: number;
-    username: string;
-    email: string;
-    first_name?: string | null;
-    last_name?: string | null;
-    role: Role;
-    group_role?: string | null; // "member", "moderator", "owner"
-    user_role?: string | null; // User's system role ('admin', 'user', 'manager')
-    joined_at: string;
-    avatar_url?: string | null;
-}
-
-export interface Group {
-    id: number;
-    name: string;
-    description?: string | null;
-    created_at: string;
-    updated_at: string;
-    member_count?: number;
-}
-
-export interface GroupDetail extends Group {
-    members: GroupMember[];
-}
-
-// ============================================================================
-// Course Group Types
-// ============================================================================
-
-export interface CourseGroup {
-    id: number;
-    course_id: number;
-    group_id: number;
-    ordering: number;
-    date_assigned: string;
-}
-
-// Module, Post, Quiz, and Progress types removed - these will be implemented by students

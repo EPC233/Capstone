@@ -1,4 +1,3 @@
-/* Base styles - Mantine handles most of this, but we keep minimal overrides */
 :root {
     --app-background-color: #f9f7f5;
 }
@@ -12,10 +11,6 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-/* Smooth scrolling */
 html {
     scroll-behavior: smooth;
 }
-
-/* Remove conflicting styles that override Mantine components */
-/* Mantine components handle their own styling */

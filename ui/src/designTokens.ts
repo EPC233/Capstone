@@ -1,26 +1,3 @@
-/**
- * Design Tokens - Centralized color system
- *
- * This file serves as the single source of truth for all colors in the application.
- * It separates module colors (reserved for module-specific UI) from app UI colors
- * (for buttons, links, and interactive elements) to prevent conflicts.
- *
- * Usage:
- * - Module colors: Use getAllModuleColors() in ColorPicker component
- * - App colors: Used in theme.js for button and input styling
- * - Semantic colors: For status indicators, alerts, etc.
- * - Neutral colors: For backgrounds, borders, text
- *
- * Current usage:
- * - theme.js: Uses designTokens.app.primary/secondary and their hover/dark variants for Mantine theme
- * - ColorPicker.tsx: Uses getAllModuleColors() for preset color palette
- *
- * To change app button colors:
- *   - Primary: Update designTokens.app.primary, primaryHover, primaryDark
- *   - Secondary: Update designTokens.app.secondary, secondaryHover, secondaryDark
- * To add module colors: Add to designTokens.moduleColors object
- */
-
 export const designTokens = {
     // Module Colors - Reserved for module-specific UI
     moduleColors: {
