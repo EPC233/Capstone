@@ -9,6 +9,7 @@ import RegisterPage from './pages/auth/RegisterPage.tsx';
 
 // Session pages
 import SessionsPage from './pages/sessions/SessionsPage';
+import SessionDetailPage from './pages/sessions/SessionDetailPage';
 
 // Friends pages
 import FriendsPage from './pages/friends/FriendsPage';
@@ -45,6 +46,16 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <SessionsPage />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/sessions/:sessionId"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <SessionDetailPage />
                                 </Layout>
                             </ProtectedRoute>
                         }

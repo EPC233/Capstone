@@ -32,7 +32,7 @@ UPLOAD_DIR = "/app/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.post("/", response_model=SessionResponse, status_code=201)
+@router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(
     session_data: SessionCreate,
     db: AsyncSession = Depends(get_db),
@@ -49,11 +49,20 @@ async def create_session(
     )
     db.add(session)
     await db.commit()
-    await db.refresh(session)
-    return session
+    
+    # Reload with relationships to avoid lazy loading issues
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session.id)
+        .options(
+            joinedload(Session.accelerometer_data),
+            joinedload(Session.graph_images)
+        )
+    )
+    return result.scalars().unique().one()
 
 
-@router.get("/", response_model=List[SessionResponse])
+@router.get("", response_model=List[SessionResponse])
 async def get_user_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -135,8 +144,17 @@ async def update_session(
     session.updated_at = datetime.utcnow()
     
     await db.commit()
-    await db.refresh(session)
-    return session
+    
+    # Reload with relationships to avoid lazy loading issues
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id)
+        .options(
+            joinedload(Session.accelerometer_data),
+            joinedload(Session.graph_images)
+        )
+    )
+    return result.scalars().unique().one()
 
 
 @router.delete("/{session_id}", status_code=204)

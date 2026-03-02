@@ -37,7 +37,7 @@ export default function Navbar() {
     // Navigation links
     const links: NavLink[] = [
         { label: 'Home', path: '/' },
-        { label: 'Workouts', path: '/workouts' },
+        { label: 'Sessions', path: '/sessions' },
         { label: 'Friends', path: '/friends' },
     ];
 

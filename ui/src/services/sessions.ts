@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+import { getApiUrl } from '../utils/api';
 
 export interface Session {
     id: number;
@@ -47,41 +45,61 @@ export interface UpdateSessionData {
     session_type?: string;
 }
 
-const api = axios.create({
-    baseURL: API_BASE_URL,
-});
+function getAuthHeaders(includeContentType = true): Record<string, string> {
+    const token = localStorage.getItem('auth_token');
+    return {
+        ...(includeContentType && { 'Content-Type': 'application/json' }),
+        ...(token && { Authorization: `Bearer ${token}` }),
+    };
+}
 
-// Add auth token to requests
-api.interceptors.request.use((config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+async function handleResponse<T>(response: Response): Promise<T> {
+    if (!response.ok) {
+        let errorMessage = `Server error: ${response.status}`;
+        try {
+            const errorData = await response.json() as { detail?: string };
+            errorMessage = errorData.detail || errorMessage;
+        } catch {
+            // Use status text if no JSON body
+        }
+        throw new Error(errorMessage);
     }
-    return config;
-});
+    if (response.status === 204) {
+        return null as T;
+    }
+    return response.json() as Promise<T>;
+}
 
 /**
  * Get all sessions for the current user
  */
 export async function getSessions(): Promise<Session[]> {
-    const response = await api.get<Session[]>('/sessions');
-    return response.data;
+    const response = await fetch(`${getApiUrl()}/sessions`, {
+        headers: getAuthHeaders(),
+    });
+    return handleResponse<Session[]>(response);
 }
 
 /**
  * Get a specific session by ID
  */
 export async function getSession(sessionId: number): Promise<Session> {
-    const response = await api.get<Session>(`/sessions/${sessionId}`);
-    return response.data;
+    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}`, {
+        headers: getAuthHeaders(),
+    });
+    return handleResponse<Session>(response);
 }
 
 /**
  * Create a new session
  */
 export async function createSession(data: CreateSessionData): Promise<Session> {
-    const response = await api.post<Session>('/sessions', data);
-    return response.data;
+    const response = await fetch(`${getApiUrl()}/sessions`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+    });
+    return handleResponse<Session>(response);
 }
 
 /**
@@ -91,15 +109,23 @@ export async function updateSession(
     sessionId: number,
     data: UpdateSessionData
 ): Promise<Session> {
-    const response = await api.put<Session>(`/sessions/${sessionId}`, data);
-    return response.data;
+    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+    });
+    return handleResponse<Session>(response);
 }
 
 /**
  * Delete a session
  */
 export async function deleteSession(sessionId: number): Promise<void> {
-    await api.delete(`/sessions/${sessionId}`);
+    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+    });
+    await handleResponse<void>(response);
 }
 
 /**
@@ -116,16 +142,12 @@ export async function uploadAccelerometerData(
         formData.append('description', description);
     }
 
-    const response = await api.post<AccelerometerData>(
-        `/sessions/${sessionId}/accelerometer`,
-        formData,
-        {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        }
-    );
-    return response.data;
+    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}/accelerometer`, {
+        method: 'POST',
+        headers: getAuthHeaders(false), // No Content-Type for FormData
+        body: formData,
+    });
+    return handleResponse<AccelerometerData>(response);
 }
 
 /**
@@ -142,28 +164,32 @@ export async function uploadGraphImage(
         formData.append('description', description);
     }
 
-    const response = await api.post<GraphImage>(
-        `/sessions/${sessionId}/graph`,
-        formData,
-        {
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        }
-    );
-    return response.data;
+    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}/graph`, {
+        method: 'POST',
+        headers: getAuthHeaders(false), // No Content-Type for FormData
+        body: formData,
+    });
+    return handleResponse<GraphImage>(response);
 }
 
 /**
  * Delete accelerometer data
  */
 export async function deleteAccelerometerData(dataId: number): Promise<void> {
-    await api.delete(`/sessions/accelerometer/${dataId}`);
+    const response = await fetch(`${getApiUrl()}/sessions/accelerometer/${dataId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+    });
+    await handleResponse<void>(response);
 }
 
 /**
  * Delete graph image
  */
 export async function deleteGraphImage(imageId: number): Promise<void> {
-    await api.delete(`/sessions/graph/${imageId}`);
+    const response = await fetch(`${getApiUrl()}/sessions/graph/${imageId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+    });
+    await handleResponse<void>(response);
 }
