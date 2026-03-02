@@ -1,6 +1,6 @@
 """
 Helper functions for database population.
-Currently not needed for simple admin user creation.
+Currently not needed for simple test user creation.
 """
 
 # This file is kept for compatibility but is not used by populate_db.py

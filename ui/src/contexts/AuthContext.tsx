@@ -15,8 +15,6 @@ interface AuthContextValue {
     login: (token: string) => Promise<void>;
     logout: () => void;
     checkAuthentication: () => Promise<void>;
-    hasRole: (role: string) => boolean;
-    hasAnyRole: (roles: string[]) => boolean;
     API_URL: string;
 }
 
@@ -101,7 +99,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Check auth on mount
     useEffect(() => {
         checkAuthentication();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function login(token: string) {
@@ -127,14 +124,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         login,
         logout,
         checkAuthentication,
-        hasRole: (role: string) => {
-            if (!userInfo || !userInfo.role) return false;
-            return userInfo.role.name === role;
-        },
-        hasAnyRole: (roles: string[]) => {
-            if (!userInfo || !userInfo.role) return false;
-            return roles.includes(userInfo.role.name);
-        },
         API_URL,
     };
 
@@ -143,7 +132,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     );
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
     const context = useContext(AuthContext);
     if (!context) {

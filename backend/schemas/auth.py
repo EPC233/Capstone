@@ -2,7 +2,7 @@
 Authentication Pydantic schemas for request/response validation
 """
 
-from datetime import date, datetime
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr
@@ -22,7 +22,6 @@ class UserCreate(UserBase):
     """Schema for creating a new user (registration)"""
 
     password: str
-    role: Optional[str] = "user"  # Default role is 'user'
 
 
 class UserLogin(BaseModel):
@@ -70,32 +69,12 @@ class TokenData(BaseModel):
     role: Optional[str] = None
 
 
-class UserDisableRequest(BaseModel):
-    """Schema for disabling/enabling a user"""
-
-    user_id: int
-    is_active: bool
-
-
-class UserRoleChangeRequest(BaseModel):
-    """Schema for changing a user's role"""
-
-    user_id: int
-    role: str
-
-
 class UserProfileUpdate(BaseModel):
     """Schema for updating user profile fields"""
 
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     avatar_url: Optional[str] = None
-
-
-class PasswordResetRequest(BaseModel):
-    """Schema for requesting a password reset email"""
-
-    email: EmailStr
 
 
 class PasswordResetForm(BaseModel):

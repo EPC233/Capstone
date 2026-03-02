@@ -60,7 +60,7 @@ services:
       - backend
     command: npm run dev -- --host 0.0.0.0
 
-  # Database population service (run once to create admin user)
+  # Database population service (run once to create test user)
   # Usage: docker-compose run --rm populate
   populate:
     build:

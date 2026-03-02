@@ -1,5 +1,5 @@
 """
-Seed script to create an admin user for the fitness tracker.
+Seed script to create a test user for the fitness tracker.
 
 Usage:
     python backend/scripts/populate_db.py
@@ -35,48 +35,48 @@ engine = create_async_engine(DATABASE_URL, echo=False)
 AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
-async def create_admin_user(db: AsyncSession):
-    """Create admin user with hardcoded credentials"""
-    # Check if admin user already exists
+async def create_test_user(db: AsyncSession):
+    """Create test user with hardcoded credentials"""
+    # Check if test user already exists
     result = await db.execute(
-        select(User).where(User.username == "admin")
+        select(User).where(User.username == "testuser")
     )
-    existing_admin = result.scalar_one_or_none()
+    existing_user = result.scalar_one_or_none()
 
-    if existing_admin:
-        print("✅ Admin user already exists")
-        return existing_admin
+    if existing_user:
+        print("✅ Test user already exists")
+        return existing_user
 
-    # Get admin role
-    result = await db.execute(select(Role).where(Role.name == "admin"))
-    admin_role = result.scalar_one_or_none()
+    # Get user role
+    result = await db.execute(select(Role).where(Role.name == "user"))
+    user_role = result.scalar_one_or_none()
 
-    if not admin_role:
-        print("❌ Admin role not found. Make sure migrations have run.")
+    if not user_role:
+        print("❌ User role not found. Make sure migrations have run.")
         sys.exit(1)
 
-    # Create admin user
-    admin_user = User(
-        username="admin",
-        email="admin@fitnesstracker.com",
-        hashed_password=get_password_hash("admin"),
-        role_id=admin_role.id,
+    # Create test user
+    test_user = User(
+        username="testuser",
+        email="test@fitnesstracker.com",
+        hashed_password=get_password_hash("testpass"),
+        role_id=user_role.id,
         email_verified=True,
         is_active=True,
-        first_name="Admin",
+        first_name="Test",
         last_name="User",
     )
 
-    db.add(admin_user)
+    db.add(test_user)
     await db.commit()
-    await db.refresh(admin_user)
+    await db.refresh(test_user)
 
-    print("✅ Created admin user:")
-    print(f"   Username: admin")
-    print(f"   Password: admin")
-    print(f"   Email: admin@fitnesstracker.com")
+    print("✅ Created test user:")
+    print(f"   Username: testuser")
+    print(f"   Password: testpass")
+    print(f"   Email: test@fitnesstracker.com")
 
-    return admin_user
+    return test_user
 
 
 async def populate_database():
@@ -93,9 +93,9 @@ async def populate_database():
         # Seed initial data (roles)
         await seed_initial_data(conn)
 
-    # Create admin user
+    # Create test user
     async with AsyncSessionLocal() as db:
-        await create_admin_user(db)
+        await create_test_user(db)
 
     print("=" * 60)
     print("✅ DATABASE POPULATION COMPLETE")

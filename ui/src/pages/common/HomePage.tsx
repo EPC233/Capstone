@@ -5,21 +5,18 @@ import {
     Stack,
     Text,
     Box,
-    Center,
     Button,
 } from '@mantine/core';
 import { designTokens } from '../../designTokens';
-import { useAuth } from '../../contexts/AuthContext';
 
 export default function HomePage() {
     const navigate = useNavigate();
-    const { userInfo } = useAuth();
 
-    // Layout wrapper styles - HomePage doesn't need sidebar margin (it's a landing page)
+    // Layout wrapper styles
     const layoutWrapperStyles: React.CSSProperties = {
-        marginLeft: 0, // No sidebar margin for landing page
+        marginLeft: 0,
         width: '100%',
-        marginTop: '170px', // Account for navbar height (keep as fixed value for navbar)
+        marginTop: '100px', // Account for navbar height
     };
 
     return (
@@ -44,39 +41,17 @@ export default function HomePage() {
                             maxWidth: '600px',
                         }}
                     >
-                        Some tagline here.
+                        Track your workouts and accelerometer data.
                     </Text>
                     <Button
                         size="lg"
-                        onClick={() => {
-                            // Navigate to appropriate dashboard based on user role
-                            const userRole = userInfo?.role?.name;
-                            if (userRole === 'admin') {
-                                navigate('/dashboard/courses');
-                            } else {
-                                // For regular users, go to their courses page
-                                navigate('/dashboard/user/courses');
-                            }
-                        }}
+                        onClick={() => navigate('/workouts')}
                         style={{
                             marginTop: designTokens.spacing.sm,
                         }}
                     >
-                        Get Started
+                        View My Workouts
                     </Button>
-                    <Center mt="xl">
-                        <Box
-                            style={{
-                                display: 'flex',
-                                gap: designTokens.spacing.xl,
-                                fontSize:
-                                    designTokens.typography.fontSize['4xl'],
-                                lineHeight:
-                                    designTokens.typography.lineHeight.tight,
-                            }}
-                        >
-                        </Box>
-                    </Center>
                 </Stack>
             </Container>
         </Box>

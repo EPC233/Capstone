@@ -9,12 +9,10 @@ import {
     UnstyledButton,
     Stack,
     Box,
-    Burger,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { IconLogout, IconUser, IconChevronDown } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSidebar } from '../../hooks/useSidebar';
 
 interface NavLink {
     label: string;
@@ -25,7 +23,6 @@ export default function Navbar() {
     const { isAuthenticated, userInfo, logout } = useAuth();
     const navigate = useNavigate();
     const isMobile = useMediaQuery('(max-width: 768px)');
-    const { drawerOpened, openDrawer, closeDrawer } = useSidebar();
 
     function handleLogout() {
         logout();
@@ -37,13 +34,13 @@ export default function Navbar() {
         return null;
     }
 
-    // Determine available links based on user role
-    const links: NavLink[] = [];
+    // Navigation links
+    const links: NavLink[] = [
+        { label: 'Home', path: '/' },
+        { label: 'Workouts', path: '/workouts' },
+    ];
 
-    // All authenticated users can see dashboard (content varies by role)
-    links.push({ label: 'Dashboard', path: '/dashboard' });
-
-    // User menu content (reusable for both desktop and mobile)
+    // User menu content
     const renderUserMenu = () => (
         <Menu
             shadow="md"
@@ -83,16 +80,6 @@ export default function Navbar() {
                                         {userInfo?.username || 'User'}
                                     </Text>
                                 </Group>
-                                <Text
-                                    size="xs"
-                                    style={{
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                    }}
-                                >
-                                    {userInfo?.role?.name || 'user'}
-                                </Text>
                             </Stack>
                         )}
                         {!isMobile && (
@@ -146,49 +133,33 @@ export default function Navbar() {
                     wrap="nowrap"
                     gap="md"
                 >
-                    {/* Mobile: Burger menu (replaces logo) | Desktop: Logo */}
-                    {isMobile ? (
-                        <Burger
-                            opened={drawerOpened}
-                            onClick={drawerOpened ? closeDrawer : openDrawer}
-                            size="sm"
-                            style={{ flexShrink: 0 }}
-                        />
-                    ) : (
-                        <Text
-                            fw={700}
-                            size="lg"
-                            component={Link}
-                            to="/"
-                            c="pink.6"
-                            style={{ textDecoration: 'none', flexShrink: 0 }}
-                        >
-                            Logo
-                        </Text>
-                    )}
+                    {/* Logo */}
+                    <Text
+                        fw={700}
+                        size="lg"
+                        component={Link}
+                        to="/"
+                        c="blue.6"
+                        style={{ textDecoration: 'none', flexShrink: 0 }}
+                    >
+                        Fitness Tracker
+                    </Text>
 
-                    {/* User menu (always visible) */}
-                    <Box style={{ flexShrink: 0, minWidth: 0 }}>
-                        {isMobile ? (
-                            renderUserMenu()
-                        ) : (
-                            /* Desktop: Navigation Links and User Menu */
-                            <Group gap="md" wrap="wrap">
-                                {links.map((link) => (
-                                    <Button
-                                        key={link.path}
-                                        component={Link}
-                                        to={link.path}
-                                        variant="subtle"
-                                        size="sm"
-                                    >
-                                        {link.label}
-                                    </Button>
-                                ))}
-                                {renderUserMenu()}
-                            </Group>
-                        )}
-                    </Box>
+                    {/* Navigation Links and User Menu */}
+                    <Group gap="md" wrap="nowrap">
+                        {!isMobile && links.map((link) => (
+                            <Button
+                                key={link.path}
+                                component={Link}
+                                to={link.path}
+                                variant="subtle"
+                                size="sm"
+                            >
+                                {link.label}
+                            </Button>
+                        ))}
+                        {renderUserMenu()}
+                    </Group>
                 </Group>
             </Container>
         </Box>

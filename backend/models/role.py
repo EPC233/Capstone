@@ -14,7 +14,7 @@ class Role(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(20), unique=True, nullable=False, index=True)
-    # Role names: 'user', 'manager', 'admin'
+    # Role names: 'user'
     description = Column(String(255), nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     updated_at = Column(

@@ -37,16 +37,6 @@ export const designTokens = {
         white: '#FFFFFF',
         darkGray: '#374151',
     },
-    // Role badge colors - matching module colors where applicable
-    roles: {
-        admin: '#996F9D', // violet (matches module purple)
-        manager: '#FF9800', // orange
-        owner: '#F44336', // red
-        moderator: '#2196F3', // blue
-        member: '#9E9E9E', // gray
-        user: '#9E9E9E', // gray
-        textOnColored: '#FFFFFF', // white text for colored backgrounds
-    },
     // Tab bar colors
     tabBar: {
         active: '#cc00ff', // primary
@@ -168,7 +158,6 @@ const fontConfig = {
 
 export const appTheme: MD3Theme = {
     ...MD3LightTheme,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fonts: configureFonts({ config: fontConfig as any }),
     colors: {
         ...MD3LightTheme.colors,

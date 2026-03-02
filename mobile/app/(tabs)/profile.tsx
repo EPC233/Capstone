@@ -145,28 +145,6 @@ export default function ProfileScreen() {
                                     {user.email}
                                 </Text>
                             )}
-                            {user?.role && (
-                                <View style={styles.roleContainer}>{/* 
-                                    <MaterialCommunityIcons
-                                        name={
-                                            user.role.name === 'admin'
-                                                ? 'shield-account'
-                                                : 'account'
-                                        }
-                                        size={16}
-                                        color={theme.colors.primary} */}
-                                    />
-                                    <Text
-                                        variant="bodySmall"
-                                        style={styles.role}
-                                    >
-                                        {user.role.name
-                                            .charAt(0)
-                                            .toUpperCase() +
-                                            user.role.name.slice(1)}
-                                    </Text>
-                                </View>
-                            )}
                         </Card.Content>
                     </Card>
 
@@ -350,16 +328,6 @@ const styles = StyleSheet.create({
         opacity: 0.7,
         marginBottom: designTokens.spacing.sm,
         textAlign: 'center',
-    },
-    roleContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: designTokens.spacing.xs,
-        marginTop: designTokens.spacing.xs,
-    },
-    role: {
-        fontWeight: '500',
-        color: designTokens.app.primary,
     },
     card: {
         marginBottom: designTokens.spacing.xl,

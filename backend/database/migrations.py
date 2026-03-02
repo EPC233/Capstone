@@ -27,7 +27,7 @@ async def seed_initial_data(conn):
 
     This ensures required data exists even on fresh databases.
     Currently seeds:
-    - Roles (user, manager, admin) - REQUIRED for authentication
+    - Roles (user) - REQUIRED for authentication
     """
     await _seed_roles(conn)
 
@@ -58,17 +58,15 @@ async def _seed_roles(conn):
             text(
                 """
             INSERT INTO roles (name, description, created_at, updated_at) VALUES 
-                ('user', 'Standard user role', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-                ('manager', 'Group manager role', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-                ('admin', 'Administrator role', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ('user', 'Standard user role', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT (name) DO NOTHING;
             """
             )
         )
 
         if count == 0:
-            print("✅ Seeded initial roles (user, manager, admin)")
+            print("✅ Seeded initial role (user)")
         else:
-            print("✅ Verified roles exist (user, manager, admin)")
+            print("✅ Verified role exists (user)")
     except Exception as e:
         print(f"⚠️  Seed note (roles): {e}")

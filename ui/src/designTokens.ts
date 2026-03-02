@@ -64,17 +64,6 @@ export const designTokens = {
         lightGray: '#F3F4F6',
     },
 
-    // Role Badge Colors - Matching mobile app
-    roles: {
-        admin: '#996F9D', // violet (matches module purple)
-        manager: '#FF9800', // orange
-        owner: '#F44336', // red
-        moderator: '#2196F3', // blue
-        member: '#9E9E9E', // gray
-        user: '#9E9E9E', // gray
-        textOnColored: '#FFFFFF', // white text for colored backgrounds
-    },
-
     // Spacing Tokens - Matching mobile app (in rem for web)
     spacing: {
         xs: '0.5rem', // 8px
