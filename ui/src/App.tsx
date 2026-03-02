@@ -7,7 +7,7 @@ import Layout from './components/layout/Layout.tsx';
 import LoginPage from './pages/auth/LoginPage.tsx';
 
 // Workout pages
-import WorkoutsPage from './pages/workouts/WorkoutsPage.tsx';
+import WorkoutsPage from './pages/workouts/WorkoutsPage';
 
 // Common pages
 import HomePage from './pages/common/HomePage';

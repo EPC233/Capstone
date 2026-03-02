@@ -34,14 +34,6 @@ export default function HomeScreen() {
                         >
                             Fitness Tracker
                         </Text>
-                        <Text
-                            variant="bodyLarge"
-                            style={[
-                                styles.subtitle,
-                                { color: theme.colors.onSurfaceVariant },
-                            ]}
-                        >
-                        </Text>
                     </View>
 
                     <View style={styles.emojiContainer}>
