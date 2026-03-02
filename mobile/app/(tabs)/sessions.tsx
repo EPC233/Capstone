@@ -2,35 +2,35 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import ProtectedRoute from '../../components/ProtectedRoute';
-import { getWorkouts, WorkoutSession } from '../../services/workouts';
+import { getSessions, Session } from '../../services/sessions';
 import { designTokens } from '../../theme';
 
-export default function WorkoutsScreen() {
+export default function SessionsScreen() {
     return (
         <ProtectedRoute>
-            <WorkoutsContent />
+            <SessionsContent />
         </ProtectedRoute>
     );
 }
 
-function WorkoutsContent() {
-    const [workouts, setWorkouts] = useState<WorkoutSession[]>([]);
+function SessionsContent() {
+    const [sessions, setSessions] = useState<Session[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const router = useRouter();
 
     useEffect(() => {
-        loadWorkouts();
+        loadSessions();
     }, []);
 
-    const loadWorkouts = async () => {
+    const loadSessions = async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getWorkouts();
-            setWorkouts(data);
+            const data = await getSessions();
+            setSessions(data);
         } catch (err) {
-            setError('Failed to load workouts');
+            setError('Failed to load sessions');
             console.error(err);
         } finally {
             setLoading(false);
@@ -49,7 +49,7 @@ function WorkoutsContent() {
         return (
             <View style={styles.centerContainer}>
                 <Text style={styles.errorText}>{error}</Text>
-                <TouchableOpacity style={styles.retryButton} onPress={loadWorkouts}>
+                <TouchableOpacity style={styles.retryButton} onPress={loadSessions}>
                     <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
             </View>
@@ -60,29 +60,29 @@ function WorkoutsContent() {
         <View style={styles.container}>
             <Text style={styles.title}>My Sessions</Text>
             
-            {workouts.length === 0 ? (
+            {sessions.length === 0 ? (
                 <View style={styles.emptyContainer}>
                     <Text style={styles.emptyText}>No Sessions yet</Text>
                     <Text style={styles.emptySubtext}>Create your first session to get started!</Text>
                 </View>
             ) : (
                 <FlatList
-                    data={workouts}
+                    data={sessions}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={({ item }) => (
                         <TouchableOpacity 
-                            style={styles.workoutCard}
-                            onPress={() => router.push(`/workouts/${item.id}`)}
+                            style={styles.sessionCard}
+                            onPress={() => router.push(`/sessions/${item.id}`)}
                         >
-                            <Text style={styles.workoutName}>{item.name}</Text>
+                            <Text style={styles.sessionName}>{item.name}</Text>
                             {item.description && (
-                                <Text style={styles.workoutDescription} numberOfLines={2}>
+                                <Text style={styles.sessionDescription} numberOfLines={2}>
                                     {item.description}
                                 </Text>
                             )}
-                            {item.workout_type && (
+                            {item.session_type && (
                                 <View style={styles.badge}>
-                                    <Text style={styles.badgeText}>{item.workout_type}</Text>
+                                    <Text style={styles.badgeText}>{item.session_type}</Text>
                                 </View>
                             )}
                             <View style={styles.statsRow}>
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
     listContent: {
         padding: 16,
     },
-    workoutCard: {
+    sessionCard: {
         backgroundColor: 'white',
         borderRadius: 12,
         padding: 16,
@@ -134,13 +134,13 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
-    workoutName: {
+    sessionName: {
         fontSize: 20,
         fontWeight: '600',
         color: designTokens.text.onSurface,
         marginBottom: 4,
     },
-    workoutDescription: {
+    sessionDescription: {
         fontSize: 14,
         color: '#666',
         marginBottom: 8,

@@ -17,8 +17,8 @@ class GraphImage(Base):
     __tablename__ = "graph_images"
 
     id = Column(Integer, primary_key=True, index=True)
-    workout_session_id = Column(
-        Integer, ForeignKey("workout_sessions.id"), nullable=False, index=True
+    session_id = Column(
+        Integer, ForeignKey("sessions.id"), nullable=False, index=True
     )
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
@@ -28,4 +28,4 @@ class GraphImage(Base):
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 
     # Relationship
-    workout_session = relationship("WorkoutSession", back_populates="graph_images")
+    session = relationship("Session", back_populates="graph_images")

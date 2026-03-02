@@ -16,13 +16,15 @@ from database import engine
 from models import (  # noqa: F401
     AccelerometerData,
     Base,
+    Friendship,
     GraphImage,
     User,
-    WorkoutSession,
+    Session,
 )
 from routes import (
     auth,
-    workouts,
+    friends,
+    sessions,
 )
 
 
@@ -57,7 +59,8 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(auth.router, prefix="/api")
-app.include_router(workouts.router, prefix="/api")
+app.include_router(friends.router, prefix="/api")
+app.include_router(sessions.router, prefix="/api")
 
 # Serve static files (production)
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")

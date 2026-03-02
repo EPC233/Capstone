@@ -1,5 +1,6 @@
 from .base import Base
 from .user import User
-from .workout_session import WorkoutSession
+from .friendship import Friendship, FriendshipStatus
+from .session import Session
 from .accelerometer_data import AccelerometerData
 from .graph_image import GraphImage

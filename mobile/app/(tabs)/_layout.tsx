@@ -47,9 +47,9 @@ export default function TabsLayout() {
                 }}
             />
             <Tabs.Screen
-                name="workouts"
+                name="sessions"
                 options={{
-                    title: 'Workouts',
+                    title: 'Sessions',
                     tabBarIcon: ({ color, size }) => (
                         <MaterialCommunityIcons
                             name="run"

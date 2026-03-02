@@ -1,5 +1,5 @@
 """
-Workout Session API endpoints
+Session API endpoints
 """
 
 import os
@@ -14,179 +14,179 @@ from sqlalchemy.orm import joinedload
 from auth import get_current_active_user
 from database import get_db
 from models.user import User
-from models.workout_session import WorkoutSession
+from models.session import Session
 from models.accelerometer_data import AccelerometerData
 from models.graph_image import GraphImage
-from schemas.workout import (
-    WorkoutSessionCreate,
-    WorkoutSessionResponse,
-    WorkoutSessionUpdate,
+from schemas.session import (
+    SessionCreate,
+    SessionResponse,
+    SessionUpdate,
     AccelerometerDataResponse,
     GraphImageResponse,
 )
 
-router = APIRouter(prefix="/workouts", tags=["workouts"])
+router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 # Upload directory for files
-UPLOAD_DIR = "/home/ethan/Desktop/Capstone Application v2/backend/uploads"
+UPLOAD_DIR = "/app/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-@router.post("/", response_model=WorkoutSessionResponse, status_code=201)
-async def create_workout_session(
-    workout_data: WorkoutSessionCreate,
+@router.post("/", response_model=SessionResponse, status_code=201)
+async def create_session(
+    session_data: SessionCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Create a new workout session for the current user.
+    Create a new session for the current user.
     """
-    workout = WorkoutSession(
+    session = Session(
         user_id=current_user.id,
-        name=workout_data.name,
-        description=workout_data.description,
-        workout_type=workout_data.workout_type,
+        name=session_data.name,
+        description=session_data.description,
+        session_type=session_data.session_type,
     )
-    db.add(workout)
+    db.add(session)
     await db.commit()
-    await db.refresh(workout)
-    return workout
+    await db.refresh(session)
+    return session
 
 
-@router.get("/", response_model=List[WorkoutSessionResponse])
-async def get_user_workouts(
+@router.get("/", response_model=List[SessionResponse])
+async def get_user_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Get all workout sessions for the current user.
+    Get all sessions for the current user.
     """
     result = await db.execute(
-        select(WorkoutSession)
-        .where(WorkoutSession.user_id == current_user.id)
+        select(Session)
+        .where(Session.user_id == current_user.id)
         .options(
-            joinedload(WorkoutSession.accelerometer_data),
-            joinedload(WorkoutSession.graph_images)
+            joinedload(Session.accelerometer_data),
+            joinedload(Session.graph_images)
         )
-        .order_by(WorkoutSession.created_at.desc())
+        .order_by(Session.created_at.desc())
     )
-    workouts = result.scalars().unique().all()
-    return workouts
+    sessions = result.scalars().unique().all()
+    return sessions
 
 
-@router.get("/{workout_id}", response_model=WorkoutSessionResponse)
-async def get_workout_session(
-    workout_id: int,
+@router.get("/{session_id}", response_model=SessionResponse)
+async def get_session(
+    session_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Get a specific workout session by ID.
+    Get a specific session by ID.
     """
     result = await db.execute(
-        select(WorkoutSession)
-        .where(WorkoutSession.id == workout_id, WorkoutSession.user_id == current_user.id)
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
         .options(
-            joinedload(WorkoutSession.accelerometer_data),
-            joinedload(WorkoutSession.graph_images)
+            joinedload(Session.accelerometer_data),
+            joinedload(Session.graph_images)
         )
     )
-    workout = result.scalars().first()
+    session = result.scalars().first()
     
-    if not workout:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout session not found"
+            detail="Session not found"
         )
     
-    return workout
+    return session
 
 
-@router.put("/{workout_id}", response_model=WorkoutSessionResponse)
-async def update_workout_session(
-    workout_id: int,
-    workout_data: WorkoutSessionUpdate,
+@router.put("/{session_id}", response_model=SessionResponse)
+async def update_session(
+    session_id: int,
+    session_data: SessionUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Update a workout session.
+    Update a session.
     """
     result = await db.execute(
-        select(WorkoutSession)
-        .where(WorkoutSession.id == workout_id, WorkoutSession.user_id == current_user.id)
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
     )
-    workout = result.scalars().first()
+    session = result.scalars().first()
     
-    if not workout:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout session not found"
+            detail="Session not found"
         )
     
     # Update fields
-    if workout_data.name is not None:
-        workout.name = workout_data.name
-    if workout_data.description is not None:
-        workout.description = workout_data.description
-    if workout_data.workout_type is not None:
-        workout.workout_type = workout_data.workout_type
+    if session_data.name is not None:
+        session.name = session_data.name
+    if session_data.description is not None:
+        session.description = session_data.description
+    if session_data.session_type is not None:
+        session.session_type = session_data.session_type
     
-    workout.updated_at = datetime.utcnow()
+    session.updated_at = datetime.utcnow()
     
     await db.commit()
-    await db.refresh(workout)
-    return workout
+    await db.refresh(session)
+    return session
 
 
-@router.delete("/{workout_id}", status_code=204)
-async def delete_workout_session(
-    workout_id: int,
+@router.delete("/{session_id}", status_code=204)
+async def delete_session(
+    session_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Delete a workout session and all associated data.
+    Delete a session and all associated data.
     """
     result = await db.execute(
-        select(WorkoutSession)
-        .where(WorkoutSession.id == workout_id, WorkoutSession.user_id == current_user.id)
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
     )
-    workout = result.scalars().first()
+    session = result.scalars().first()
     
-    if not workout:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout session not found"
+            detail="Session not found"
         )
     
-    await db.delete(workout)
+    await db.delete(session)
     await db.commit()
     return None
 
 
-@router.post("/{workout_id}/accelerometer", response_model=AccelerometerDataResponse, status_code=201)
+@router.post("/{session_id}/accelerometer", response_model=AccelerometerDataResponse, status_code=201)
 async def upload_accelerometer_data(
-    workout_id: int,
+    session_id: int,
     file: UploadFile = File(...),
     description: str = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Upload accelerometer CSV data for a workout session.
+    Upload accelerometer CSV data for a session.
     """
-    # Verify workout exists and belongs to user
+    # Verify session exists and belongs to user
     result = await db.execute(
-        select(WorkoutSession)
-        .where(WorkoutSession.id == workout_id, WorkoutSession.user_id == current_user.id)
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
     )
-    workout = result.scalars().first()
+    session = result.scalars().first()
     
-    if not workout:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout session not found"
+            detail="Session not found"
         )
     
     # Validate file type
@@ -197,7 +197,7 @@ async def upload_accelerometer_data(
         )
     
     # Save file
-    file_path = os.path.join(UPLOAD_DIR, f"accel_{workout_id}_{datetime.utcnow().timestamp()}_{file.filename}")
+    file_path = os.path.join(UPLOAD_DIR, f"accel_{session_id}_{datetime.utcnow().timestamp()}_{file.filename}")
     contents = await file.read()
     
     with open(file_path, "wb") as f:
@@ -205,7 +205,7 @@ async def upload_accelerometer_data(
     
     # Create database record
     accel_data = AccelerometerData(
-        workout_session_id=workout_id,
+        session_id=session_id,
         file_name=file.filename,
         file_path=file_path,
         file_size=len(contents),
@@ -219,28 +219,28 @@ async def upload_accelerometer_data(
     return accel_data
 
 
-@router.post("/{workout_id}/graph", response_model=GraphImageResponse, status_code=201)
+@router.post("/{session_id}/graph", response_model=GraphImageResponse, status_code=201)
 async def upload_graph_image(
-    workout_id: int,
+    session_id: int,
     file: UploadFile = File(...),
     description: str = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """
-    Upload a graph image for a workout session.
+    Upload a graph image for a session.
     """
-    # Verify workout exists and belongs to user
+    # Verify session exists and belongs to user
     result = await db.execute(
-        select(WorkoutSession)
-        .where(WorkoutSession.id == workout_id, WorkoutSession.user_id == current_user.id)
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
     )
-    workout = result.scalars().first()
+    session = result.scalars().first()
     
-    if not workout:
+    if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Workout session not found"
+            detail="Session not found"
         )
     
     # Validate file type
@@ -255,7 +255,7 @@ async def upload_graph_image(
     image_type = file.filename.split('.')[-1].lower()
     
     # Save file
-    file_path = os.path.join(UPLOAD_DIR, f"graph_{workout_id}_{datetime.utcnow().timestamp()}_{file.filename}")
+    file_path = os.path.join(UPLOAD_DIR, f"graph_{session_id}_{datetime.utcnow().timestamp()}_{file.filename}")
     contents = await file.read()
     
     with open(file_path, "wb") as f:
@@ -263,7 +263,7 @@ async def upload_graph_image(
     
     # Create database record
     graph_image = GraphImage(
-        workout_session_id=workout_id,
+        session_id=session_id,
         file_name=file.filename,
         file_path=file_path,
         file_size=len(contents),
@@ -289,10 +289,10 @@ async def delete_accelerometer_data(
     """
     result = await db.execute(
         select(AccelerometerData)
-        .join(WorkoutSession)
+        .join(Session)
         .where(
             AccelerometerData.id == data_id,
-            WorkoutSession.user_id == current_user.id
+            Session.user_id == current_user.id
         )
     )
     data = result.scalars().first()
@@ -323,10 +323,10 @@ async def delete_graph_image(
     """
     result = await db.execute(
         select(GraphImage)
-        .join(WorkoutSession)
+        .join(Session)
         .where(
             GraphImage.id == image_id,
-            WorkoutSession.user_id == current_user.id
+            Session.user_id == current_user.id
         )
     )
     image = result.scalars().first()

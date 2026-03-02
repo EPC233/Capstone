@@ -1,13 +1,13 @@
 import { Container, Title, Text } from '@mantine/core';
 
-export default function WorkoutsPage() {
+export default function SessionsPage() {
     return (
         <Container size="md" py="xl">
             <Title order={1} mb="md">
-                Workouts
+                Sessions
             </Title>
             <Text c="dimmed">
-                View and manage your workout sessions here.
+                View and manage your sessions here.
             </Text>
         </Container>
     );

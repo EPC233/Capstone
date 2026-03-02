@@ -7,8 +7,8 @@ import Layout from './components/layout/Layout.tsx';
 import LoginPage from './pages/auth/LoginPage.tsx';
 import RegisterPage from './pages/auth/RegisterPage.tsx';
 
-// Workout pages
-import WorkoutsPage from './pages/workouts/WorkoutsPage';
+// Session pages
+import SessionsPage from './pages/sessions/SessionsPage';
 
 // Common pages
 import HomePage from './pages/common/HomePage';
@@ -35,13 +35,13 @@ export default function App() {
                         }
                     />
 
-                    {/* Workout routes */}
+                    {/* Session routes */}
                     <Route
-                        path="/workouts"
+                        path="/sessions"
                         element={
                             <ProtectedRoute>
                                 <Layout>
-                                    <WorkoutsPage />
+                                    <SessionsPage />
                                 </Layout>
                             </ProtectedRoute>
                         }

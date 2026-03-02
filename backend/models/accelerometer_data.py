@@ -17,8 +17,8 @@ class AccelerometerData(Base):
     __tablename__ = "accelerometer_data"
 
     id = Column(Integer, primary_key=True, index=True)
-    workout_session_id = Column(
-        Integer, ForeignKey("workout_sessions.id"), nullable=False, index=True
+    session_id = Column(
+        Integer, ForeignKey("sessions.id"), nullable=False, index=True
     )
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
@@ -26,4 +26,4 @@ class AccelerometerData(Base):
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 
-    workout_session = relationship("WorkoutSession", back_populates="accelerometer_data")
+    session = relationship("Session", back_populates="accelerometer_data")

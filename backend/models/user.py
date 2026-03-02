@@ -24,6 +24,6 @@ class User(Base):
     avatar_url = Column(String(500), nullable=True)
 
     # Relationships
-    workout_sessions = relationship(
-        "WorkoutSession", back_populates="user", cascade="all, delete-orphan"
+    sessions = relationship(
+        "Session", back_populates="user", cascade="all, delete-orphan"
     )

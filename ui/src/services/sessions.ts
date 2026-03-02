@@ -2,12 +2,12 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-export interface WorkoutSession {
+export interface Session {
     id: number;
     user_id: number;
     name: string;
     description?: string;
-    workout_type?: string;
+    session_type?: string;
     created_at: string;
     updated_at: string;
     accelerometer_data: AccelerometerData[];
@@ -16,7 +16,7 @@ export interface WorkoutSession {
 
 export interface AccelerometerData {
     id: number;
-    workout_session_id: number;
+    session_id: number;
     file_name: string;
     file_path: string;
     file_size?: number;
@@ -26,7 +26,7 @@ export interface AccelerometerData {
 
 export interface GraphImage {
     id: number;
-    workout_session_id: number;
+    session_id: number;
     file_name: string;
     file_path: string;
     file_size?: number;
@@ -35,16 +35,16 @@ export interface GraphImage {
     created_at: string;
 }
 
-export interface CreateWorkoutData {
+export interface CreateSessionData {
     name: string;
     description?: string;
-    workout_type?: string;
+    session_type?: string;
 }
 
-export interface UpdateWorkoutData {
+export interface UpdateSessionData {
     name?: string;
     description?: string;
-    workout_type?: string;
+    session_type?: string;
 }
 
 const api = axios.create({
@@ -61,57 +61,52 @@ api.interceptors.request.use((config) => {
 });
 
 /**
- * Get all workout sessions for the current user
+ * Get all sessions for the current user
  */
-export async function getWorkouts(): Promise<WorkoutSession[]> {
-    const response = await api.get<WorkoutSession[]>('/workouts');
+export async function getSessions(): Promise<Session[]> {
+    const response = await api.get<Session[]>('/sessions');
     return response.data;
 }
 
 /**
- * Get a specific workout session by ID
+ * Get a specific session by ID
  */
-export async function getWorkout(workoutId: number): Promise<WorkoutSession> {
-    const response = await api.get<WorkoutSession>(`/workouts/${workoutId}`);
+export async function getSession(sessionId: number): Promise<Session> {
+    const response = await api.get<Session>(`/sessions/${sessionId}`);
     return response.data;
 }
 
 /**
- * Create a new workout session
+ * Create a new session
  */
-export async function createWorkout(
-    data: CreateWorkoutData
-): Promise<WorkoutSession> {
-    const response = await api.post<WorkoutSession>('/workouts', data);
+export async function createSession(data: CreateSessionData): Promise<Session> {
+    const response = await api.post<Session>('/sessions', data);
     return response.data;
 }
 
 /**
- * Update a workout session
+ * Update a session
  */
-export async function updateWorkout(
-    workoutId: number,
-    data: UpdateWorkoutData
-): Promise<WorkoutSession> {
-    const response = await api.put<WorkoutSession>(
-        `/workouts/${workoutId}`,
-        data
-    );
+export async function updateSession(
+    sessionId: number,
+    data: UpdateSessionData
+): Promise<Session> {
+    const response = await api.put<Session>(`/sessions/${sessionId}`, data);
     return response.data;
 }
 
 /**
- * Delete a workout session
+ * Delete a session
  */
-export async function deleteWorkout(workoutId: number): Promise<void> {
-    await api.delete(`/workouts/${workoutId}`);
+export async function deleteSession(sessionId: number): Promise<void> {
+    await api.delete(`/sessions/${sessionId}`);
 }
 
 /**
- * Upload accelerometer CSV data for a workout
+ * Upload accelerometer CSV data for a session
  */
 export async function uploadAccelerometerData(
-    workoutId: number,
+    sessionId: number,
     file: File,
     description?: string
 ): Promise<AccelerometerData> {
@@ -122,7 +117,7 @@ export async function uploadAccelerometerData(
     }
 
     const response = await api.post<AccelerometerData>(
-        `/workouts/${workoutId}/accelerometer`,
+        `/sessions/${sessionId}/accelerometer`,
         formData,
         {
             headers: {
@@ -134,10 +129,10 @@ export async function uploadAccelerometerData(
 }
 
 /**
- * Upload a graph image for a workout
+ * Upload a graph image for a session
  */
 export async function uploadGraphImage(
-    workoutId: number,
+    sessionId: number,
     file: File,
     description?: string
 ): Promise<GraphImage> {
@@ -148,7 +143,7 @@ export async function uploadGraphImage(
     }
 
     const response = await api.post<GraphImage>(
-        `/workouts/${workoutId}/graph`,
+        `/sessions/${sessionId}/graph`,
         formData,
         {
             headers: {
@@ -163,12 +158,12 @@ export async function uploadGraphImage(
  * Delete accelerometer data
  */
 export async function deleteAccelerometerData(dataId: number): Promise<void> {
-    await api.delete(`/workouts/accelerometer/${dataId}`);
+    await api.delete(`/sessions/accelerometer/${dataId}`);
 }
 
 /**
  * Delete graph image
  */
 export async function deleteGraphImage(imageId: number): Promise<void> {
-    await api.delete(`/workouts/graph/${imageId}`);
+    await api.delete(`/sessions/graph/${imageId}`);
 }

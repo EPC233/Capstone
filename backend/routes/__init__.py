@@ -1,10 +1,12 @@
 # Routes will be imported here
 from . import (
     auth,
-    workouts,
+    friends,
+    sessions,
 )
 
 __all__ = [
     "auth",
-    "workouts",
+    "friends",
+    "sessions",
 ]

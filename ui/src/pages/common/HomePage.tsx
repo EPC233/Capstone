@@ -41,16 +41,16 @@ export default function HomePage() {
                             maxWidth: '600px',
                         }}
                     >
-                        Track your workouts and accelerometer data.
+                        Track your sessions and accelerometer data.
                     </Text>
                     <Button
                         size="lg"
-                        onClick={() => navigate('/workouts')}
+                        onClick={() => navigate('/sessions')}
                         style={{
                             marginTop: designTokens.spacing.sm,
                         }}
                     >
-                        View My Workouts
+                        View My Sessions
                     </Button>
                 </Stack>
             </Container>

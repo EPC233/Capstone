@@ -1,3 +1,7 @@
+"""
+Session Pydantic schemas for request/response validation
+"""
+
 from datetime import datetime
 from typing import List, Optional
 
@@ -11,7 +15,7 @@ class AccelerometerDataBase(BaseModel):
 
 class AccelerometerDataResponse(AccelerometerDataBase):
     id: int
-    workout_session_id: int
+    session_id: int
     file_name: str
     file_path: str
     file_size: Optional[int] = None
@@ -28,7 +32,7 @@ class GraphImageBase(BaseModel):
 
 class GraphImageResponse(GraphImageBase):
     id: int
-    workout_session_id: int
+    session_id: int
     file_name: str
     file_path: str
     file_size: Optional[int] = None
@@ -39,24 +43,24 @@ class GraphImageResponse(GraphImageBase):
         from_attributes = True
 
 
-# Workout Session Schemas
-class WorkoutSessionBase(BaseModel):
+# Session Schemas
+class SessionBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None
-    workout_type: Optional[str] = Field(None, max_length=100)
+    session_type: Optional[str] = Field(None, max_length=100)
 
 
-class WorkoutSessionCreate(WorkoutSessionBase):
+class SessionCreate(SessionBase):
     pass
 
 
-class WorkoutSessionUpdate(BaseModel):
+class SessionUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=200)
     description: Optional[str] = None
-    workout_type: Optional[str] = Field(None, max_length=100)
+    session_type: Optional[str] = Field(None, max_length=100)
 
 
-class WorkoutSessionResponse(WorkoutSessionBase):
+class SessionResponse(SessionBase):
     id: int
     user_id: int
     created_at: datetime
