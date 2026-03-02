@@ -1,7 +1,3 @@
-"""
-User model for authentication and authorization
-"""
-
 from datetime import datetime
 
 from sqlalchemy import (
@@ -23,23 +19,19 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
-    email_verified = Column(
-        Boolean, default=False, nullable=False, index=True
-    )  # Email verification status
-    is_active = Column(
-        Boolean, default=True, nullable=False, index=True
-    )  # User account active status
+    email_verified = Column(Boolean, default=False, nullable=False, index=True)
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
-    # Optional user profile fields
+    # Optional fields
     first_name = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=True)
-    avatar_url = Column(String(500), nullable=True)  # URL to avatar image
+    avatar_url = Column(String(500), nullable=True)
 
-    # Relationship to WorkoutSessions
+    # Relationships
     workout_sessions = relationship(
         "WorkoutSession", back_populates="user", cascade="all, delete-orphan"
     )

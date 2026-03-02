@@ -5,6 +5,7 @@ import Layout from './components/layout/Layout.tsx';
 
 // Auth pages
 import LoginPage from './pages/auth/LoginPage.tsx';
+import RegisterPage from './pages/auth/RegisterPage.tsx';
 
 // Workout pages
 import WorkoutsPage from './pages/workouts/WorkoutsPage';
@@ -20,6 +21,7 @@ export default function App() {
                 <Routes>
                     {/* Public routes */}
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
 
                     {/* Protected routes */}
                     <Route

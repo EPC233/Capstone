@@ -1,7 +1,3 @@
-"""
-Graph image model for storing visualization images
-"""
-
 from datetime import datetime
 
 from sqlalchemy import (
@@ -25,9 +21,9 @@ class GraphImage(Base):
         Integer, ForeignKey("workout_sessions.id"), nullable=False, index=True
     )
     file_name = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)  # Path to stored image file
-    file_size = Column(Integer, nullable=True)  # File size in bytes
-    image_type = Column(String(50), nullable=True)  # e.g., "png", "jpg", "svg"
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=True)
+    image_type = Column(String(50), nullable=True)
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 

@@ -1,7 +1,3 @@
-"""
-Accelerometer data model for storing CSV files
-"""
-
 from datetime import datetime
 
 from sqlalchemy import (
@@ -25,10 +21,9 @@ class AccelerometerData(Base):
         Integer, ForeignKey("workout_sessions.id"), nullable=False, index=True
     )
     file_name = Column(String(255), nullable=False)
-    file_path = Column(String(500), nullable=False)  # Path to stored CSV file
-    file_size = Column(Integer, nullable=True)  # File size in bytes
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=True)
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 
-    # Relationship
     workout_session = relationship("WorkoutSession", back_populates="accelerometer_data")

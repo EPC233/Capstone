@@ -24,7 +24,7 @@ class WorkoutSession(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    workout_type = Column(String(100), nullable=True)  # e.g., "running", "cycling", "weights"
+    workout_type = Column(String(100), nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
@@ -33,7 +33,9 @@ class WorkoutSession(Base):
     # Relationships
     user = relationship("User", back_populates="workout_sessions")
     accelerometer_data = relationship(
-        "AccelerometerData", back_populates="workout_session", cascade="all, delete-orphan"
+        "AccelerometerData",
+        back_populates="workout_session",
+        cascade="all, delete-orphan",
     )
     graph_images = relationship(
         "GraphImage", back_populates="workout_session", cascade="all, delete-orphan"
