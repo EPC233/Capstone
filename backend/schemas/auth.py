@@ -31,23 +31,12 @@ class UserLogin(BaseModel):
     password: str
 
 
-class RoleInUser(BaseModel):
-    """Role information included in User response"""
-
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    name: str
-    description: Optional[str] = None
-
-
 class UserResponse(UserBase):
     """What a user looks like when we send it back to the client"""
 
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    role: RoleInUser
     email_verified: bool
     is_active: bool
     created_at: datetime
@@ -66,7 +55,6 @@ class TokenData(BaseModel):
 
     username: Optional[str] = None
     user_id: Optional[int] = None
-    role: Optional[str] = None
 
 
 class UserProfileUpdate(BaseModel):

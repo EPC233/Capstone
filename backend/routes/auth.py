@@ -7,7 +7,6 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Security, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import joinedload
 
 from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -20,7 +19,6 @@ from auth import (
     security_scheme,
 )
 from database import get_db
-from models.role import Role
 from models.user import User
 from schemas.auth import (
     Token,
@@ -40,7 +38,6 @@ async def register(
 ):
     """
     Register a new user.
-    All users are created with the 'user' role.
     """
     # Sanitize input - strip whitespace
     username = user_data.username.strip()
@@ -62,15 +59,6 @@ async def register(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Password cannot be empty",
-        )
-
-    # Get user role from database
-    role_result = await db.execute(select(Role).where(Role.name == "user"))
-    role = role_result.scalar_one_or_none()
-    if not role:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="User role not found in database",
         )
 
     # Check if username already exists
@@ -95,7 +83,6 @@ async def register(
         username=username,
         email=email,
         hashed_password=hashed_password,
-        role_id=role.id,
         email_verified=True,
         first_name=user_data.first_name,
         last_name=user_data.last_name,
@@ -105,12 +92,6 @@ async def register(
     db.add(db_user)
     await db.commit()
     await db.refresh(db_user)
-
-    # Reload user with role relationship for proper serialization
-    result = await db.execute(
-        select(User).where(User.id == db_user.id).options(joinedload(User.role))
-    )
-    db_user = result.scalar_one()
 
     return db_user
 
@@ -135,16 +116,9 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
             detail="Your account has been disabled.",
         )
 
-    # Ensure role is loaded
-    if user.role is None:
-        result = await db.execute(
-            select(User).where(User.id == user.id).options(joinedload(User.role))
-        )
-        user = result.scalar_one()
-
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "user_id": user.id, "role": user.role.name},
+        data={"sub": user.username, "user_id": user.id},
         expires_delta=access_token_expires,
     )
     return {"access_token": access_token, "token_type": "bearer"}
@@ -192,11 +166,5 @@ async def update_my_profile(
     await db.commit()
     await db.refresh(current_user)
 
-    # Reload with role relationship
-    result = await db.execute(
-        select(User).where(User.id == current_user.id).options(joinedload(User.role))
-    )
-    user = result.scalar_one()
-
-    return user
+    return current_user
 

@@ -1,9 +1,3 @@
-export interface Role {
-    id: number;
-    name: string;
-    description?: string | null;
-}
-
 export interface User {
     id: number;
     username: string;
@@ -11,7 +5,8 @@ export interface User {
     first_name?: string | null;
     last_name?: string | null;
     avatar_url?: string | null;
-    role: Role;
+    email_verified: boolean;
+    is_active: boolean;
     created_at: string; // ISO datetime string
     updated_at: string; // ISO datetime string
 }
@@ -25,7 +20,6 @@ export interface UserCreate {
     username: string;
     email: string;
     password: string;
-    role?: string;
     first_name?: string | null;
     last_name?: string | null;
 }
@@ -34,7 +28,6 @@ export interface UserUpdate {
     username?: string | null;
     email?: string | null;
     password?: string | null;
-    role?: string | null;
     first_name?: string | null;
     last_name?: string | null;
 }

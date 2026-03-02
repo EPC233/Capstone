@@ -1,5 +1,5 @@
 """
-Authentication utilities: password hashing, JWT tokens, and role-based access control
+Authentication utilities: password hashing and JWT tokens
 """
 
 import hashlib
@@ -110,31 +110,25 @@ def verify_password_reset_token(token: str) -> Optional[dict]:
 
 
 async def get_user_by_username(username: str, db: AsyncSession) -> Optional[User]:
-    """Get a user by username with role relationship loaded"""
-    from sqlalchemy.orm import joinedload
-
+    """Get a user by username"""
     result = await db.execute(
-        select(User).where(User.username == username).options(joinedload(User.role))
+        select(User).where(User.username == username)
     )
     return result.scalar_one_or_none()
 
 
 async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
-    """Get a user by email with role relationship loaded"""
-    from sqlalchemy.orm import joinedload
-
+    """Get a user by email"""
     result = await db.execute(
-        select(User).where(User.email == email).options(joinedload(User.role))
+        select(User).where(User.email == email)
     )
     return result.scalar_one_or_none()
 
 
 async def get_user_by_id(user_id: int, db: AsyncSession) -> Optional[User]:
-    """Get a user by ID with role relationship loaded"""
-    from sqlalchemy.orm import joinedload
-
+    """Get a user by ID"""
     result = await db.execute(
-        select(User).where(User.id == user_id).options(joinedload(User.role))
+        select(User).where(User.id == user_id)
     )
     return result.scalar_one_or_none()
 
@@ -163,8 +157,6 @@ async def get_current_user(
     """
     Get the current authenticated user from JWT token.
     """
-    from sqlalchemy.orm import joinedload
-
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -177,9 +169,9 @@ async def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    # Load user with role relationship
+    # Load user
     result = await db.execute(
-        select(User).where(User.username == username).options(joinedload(User.role))
+        select(User).where(User.username == username)
     )
     authenticated_user = result.scalar_one_or_none()
     if authenticated_user is None:
@@ -207,7 +199,6 @@ async def get_current_user_optional(
     """
     if token is None:
         return None
-    from sqlalchemy.orm import joinedload
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -218,7 +209,7 @@ async def get_current_user_optional(
         return None
 
     result = await db.execute(
-        select(User).where(User.username == username).options(joinedload(User.role))
+        select(User).where(User.username == username)
     )
     return result.scalar_one_or_none()
 
@@ -227,4 +218,11 @@ async def get_current_active_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """Get the current active user"""
+    return current_user
+
+
+async def require_user(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """Dependency to require any authenticated user"""
     return current_user

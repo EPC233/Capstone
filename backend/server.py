@@ -11,14 +11,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from database import engine
-from database.migrations import run_migrations, seed_initial_data
 
 # Import models to ensure they're registered with Base.metadata for table creation
 from models import (  # noqa: F401
     AccelerometerData,
     Base,
     GraphImage,
-    Role,
     User,
     WorkoutSession,
 )
@@ -34,8 +32,6 @@ async def lifespan(app: FastAPI):
     # Startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        await run_migrations(conn)
-        await seed_initial_data(conn)
 
     print("✅ Database tables created successfully")
     yield

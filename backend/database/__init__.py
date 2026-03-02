@@ -1,7 +1,3 @@
-"""
-Database connection and session management
-"""
-
 import os
 
 from dotenv import load_dotenv
@@ -30,15 +26,5 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 
 
 async def get_db():
-    """
-    Generator function that yields a database session.
-
-    The 'yield' keyword is special - it:
-    1. Creates a session when the function is called
-    2. Gives it to your endpoint function
-    3. Closes the session when the endpoint finishes
-
-    This ensures database connections are properly cleaned up.
-    """
     async with AsyncSessionLocal() as session:
         yield session

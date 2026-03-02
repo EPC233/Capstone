@@ -1,10 +1,4 @@
 
-export interface Role {
-    id: number;
-    name: string;
-    description?: string | null;
-}
-
 export interface User {
     id: number;
     username: string;
@@ -24,7 +18,6 @@ export interface UserCreate {
     username: string;
     email: string;
     password: string;
-    role?: string;
     first_name?: string | null;
     last_name?: string | null;
     avatar_url?: string | null;

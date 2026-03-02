@@ -18,8 +18,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 
 from auth import get_password_hash
-from database.migrations import seed_initial_data
-from models import Base, Role, User
+from models import Base, User
 
 # Load environment variables
 load_dotenv()
@@ -47,20 +46,11 @@ async def create_test_user(db: AsyncSession):
         print("✅ Test user already exists")
         return existing_user
 
-    # Get user role
-    result = await db.execute(select(Role).where(Role.name == "user"))
-    user_role = result.scalar_one_or_none()
-
-    if not user_role:
-        print("❌ User role not found. Make sure migrations have run.")
-        sys.exit(1)
-
     # Create test user
     test_user = User(
         username="testuser",
         email="test@fitnesstracker.com",
         hashed_password=get_password_hash("testpass"),
-        role_id=user_role.id,
         email_verified=True,
         is_active=True,
         first_name="Test",
@@ -89,9 +79,6 @@ async def populate_database():
         # Create tables
         await conn.run_sync(Base.metadata.create_all)
         print("✅ Database tables created")
-
-        # Seed initial data (roles)
-        await seed_initial_data(conn)
 
     # Create test user
     async with AsyncSessionLocal() as db:

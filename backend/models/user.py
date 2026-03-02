@@ -8,7 +8,6 @@ from sqlalchemy import (
     TIMESTAMP,
     Boolean,
     Column,
-    ForeignKey,
     Integer,
     String,
 )
@@ -24,9 +23,6 @@ class User(Base):
     username = Column(String(50), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
-    role_id = Column(
-        Integer, ForeignKey("roles.id"), nullable=False, index=True, default=1
-    )  # Default to 'user' role (id=1)
     email_verified = Column(
         Boolean, default=False, nullable=False, index=True
     )  # Email verification status
@@ -43,8 +39,7 @@ class User(Base):
     last_name = Column(String(100), nullable=True)
     avatar_url = Column(String(500), nullable=True)  # URL to avatar image
 
-    # Relationship to Role
-    role = relationship("Role", backref="users")
-    
     # Relationship to WorkoutSessions
-    workout_sessions = relationship("WorkoutSession", back_populates="user", cascade="all, delete-orphan")
+    workout_sessions = relationship(
+        "WorkoutSession", back_populates="user", cascade="all, delete-orphan"
+    )
