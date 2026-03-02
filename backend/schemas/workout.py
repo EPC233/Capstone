@@ -1,7 +1,3 @@
-"""
-Pydantic schemas for workout sessions and fitness data
-"""
-
 from datetime import datetime
 from typing import List, Optional
 

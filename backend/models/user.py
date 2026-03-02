@@ -1,7 +1,4 @@
-from datetime import datetime
-
 from sqlalchemy import (
-    TIMESTAMP,
     Boolean,
     Column,
     Integer,
@@ -20,11 +17,6 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
     email_verified = Column(Boolean, default=False, nullable=False, index=True)
-    is_active = Column(Boolean, default=True, nullable=False, index=True)
-    created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
-    updated_at = Column(
-        TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
-    )
 
     # Optional fields
     first_name = Column(String(100), nullable=True)

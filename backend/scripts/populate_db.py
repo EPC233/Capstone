@@ -1,10 +1,3 @@
-"""
-Seed script to create a test user for the fitness tracker.
-
-Usage:
-    python backend/scripts/populate_db.py
-"""
-
 import asyncio
 import os
 import sys
@@ -52,7 +45,6 @@ async def create_test_user(db: AsyncSession):
         email="test@fitnesstracker.com",
         hashed_password=get_password_hash("testpass"),
         email_verified=True,
-        is_active=True,
         first_name="Test",
         last_name="User",
     )

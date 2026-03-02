@@ -1,8 +1,3 @@
-"""
-Authentication Pydantic schemas for request/response validation
-"""
-
-from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr
@@ -38,9 +33,6 @@ class UserResponse(UserBase):
 
     id: int
     email_verified: bool
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
 
 
 class Token(BaseModel):

@@ -5,8 +5,6 @@ export interface User {
     email: string;
     first_name?: string | null;
     last_name?: string | null;
-    created_at: string; // ISO datetime string
-    updated_at: string; // ISO datetime string
 }
 
 export interface Token {

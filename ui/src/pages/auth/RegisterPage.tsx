@@ -102,8 +102,16 @@ export default function RegisterPage() {
   }
 
   return (
-    <Container size="md" py="xl">
-      <Paper p="xl" withBorder>
+    <Container
+      size="xs"
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Paper p="xl" withBorder w="100%">
         <Stack gap="xl">
           <form onSubmit={handleSubmit}>
             <Stack gap="md">
