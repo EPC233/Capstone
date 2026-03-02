@@ -369,5 +369,3 @@ async def update_user_profile(
 
     return user
 
-
-# Password reset endpoints removed - email functionality disabled in starter code
