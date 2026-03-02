@@ -34,3 +34,44 @@ export interface UserProfileUpdate {
   last_name?: string | null;
   avatar_url?: string | null;
 }
+
+// ============================================================================
+// FRIEND TYPES
+// ============================================================================
+
+export type FriendshipStatus = 'pending' | 'accepted' | 'rejected';
+
+export interface FriendUser {
+  id: number;
+  username: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+}
+
+export interface FriendshipResponse {
+  id: number;
+  requester: FriendUser;
+  addressee: FriendUser;
+  status: FriendshipStatus;
+  created_at: string;
+}
+
+export interface FriendListResponse {
+  id: number;
+  username: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  avatar_url?: string | null;
+  friendship_id: number;
+}
+
+export interface FriendRequest {
+  addressee_id: number;
+}
+
+export interface FriendRequestResponse {
+  friendship_id: number;
+  accept: boolean;
+}
+

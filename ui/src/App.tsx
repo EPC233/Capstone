@@ -10,6 +10,9 @@ import RegisterPage from './pages/auth/RegisterPage.tsx';
 // Session pages
 import SessionsPage from './pages/sessions/SessionsPage';
 
+// Friends pages
+import FriendsPage from './pages/friends/FriendsPage';
+
 // Common pages
 import HomePage from './pages/common/HomePage';
 import './globals.css';
@@ -42,6 +45,18 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <SessionsPage />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Friends routes */}
+                    <Route
+                        path="/friends"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <FriendsPage />
                                 </Layout>
                             </ProtectedRoute>
                         }

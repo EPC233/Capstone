@@ -161,3 +161,30 @@ async def update_my_profile(
 
     return current_user
 
+
+@router.get(
+    "/users/search",
+    response_model=list[UserResponse],
+    dependencies=[Security(security_scheme)],
+)
+async def search_users(
+    q: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Search for users by username.
+    Returns users whose username contains the search query.
+    Excludes the current user from results.
+    """
+    if not q or len(q) < 2:
+        return []
+    
+    # Search for users with matching username (case-insensitive)
+    result = await db.execute(
+        select(User)
+        .where(User.username.ilike(f"%{q}%"))
+        .where(User.id != current_user.id)
+        .limit(20)
+    )
+    return result.scalars().all()
