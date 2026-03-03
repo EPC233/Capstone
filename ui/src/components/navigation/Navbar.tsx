@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
     Group,
     Button,
@@ -22,6 +22,7 @@ interface NavLink {
 export default function Navbar() {
     const { isAuthenticated, userInfo, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
     const isMobile = useMediaQuery('(max-width: 768px)');
 
     function handleLogout() {
@@ -95,7 +96,15 @@ export default function Navbar() {
 
             <Menu.Dropdown>
                 <Menu.Label>Account</Menu.Label>
-                <Menu.Item leftSection={<IconUser size={14} />}>
+                <Menu.Item
+                    leftSection={<IconUser size={14} />}
+                    onClick={() => navigate('/profile')}
+                    style={{
+                        backgroundColor: location.pathname === '/profile'
+                            ? 'var(--mantine-color-blue-0)'
+                            : undefined,
+                    }}
+                >
                     Profile
                 </Menu.Item>
                 <Menu.Item

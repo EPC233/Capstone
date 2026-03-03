@@ -14,6 +14,10 @@ import SessionDetailPage from './pages/sessions/SessionDetailPage';
 // Friends pages
 import FriendsPage from './pages/friends/FriendsPage';
 
+// Profile pages
+import ProfilePage from './pages/profile/ProfilePage';
+import EditProfilePage from './pages/profile/EditProfilePage';
+
 // Common pages
 import HomePage from './pages/common/HomePage';
 import './globals.css';
@@ -68,6 +72,28 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <FriendsPage />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Profile routes */}
+                    <Route
+                        path="/profile"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <ProfilePage />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+                    <Route
+                        path="/profile/edit"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <EditProfilePage />
                                 </Layout>
                             </ProtectedRoute>
                         }
