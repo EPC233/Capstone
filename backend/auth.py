@@ -1,7 +1,3 @@
-"""
-Authentication utilities: password hashing and JWT tokens
-"""
-
 import hashlib
 import os
 from datetime import datetime, timedelta
@@ -20,13 +16,11 @@ from models.user import User
 
 load_dotenv()
 
-# Configuration
 BCRYPT_ROUNDS = 12
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# Security scheme for Swagger UI
 security_scheme = HTTPBearer()
 optional_bearer = HTTPBearer(auto_error=False)
 
@@ -111,25 +105,19 @@ def verify_password_reset_token(token: str) -> Optional[dict]:
 
 async def get_user_by_username(username: str, db: AsyncSession) -> Optional[User]:
     """Get a user by username"""
-    result = await db.execute(
-        select(User).where(User.username == username)
-    )
+    result = await db.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
     """Get a user by email"""
-    result = await db.execute(
-        select(User).where(User.email == email)
-    )
+    result = await db.execute(select(User).where(User.email == email))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_id(user_id: int, db: AsyncSession) -> Optional[User]:
     """Get a user by ID"""
-    result = await db.execute(
-        select(User).where(User.id == user_id)
-    )
+    result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 
 
@@ -170,9 +158,7 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     # Load user
-    result = await db.execute(
-        select(User).where(User.username == username)
-    )
+    result = await db.execute(select(User).where(User.username == username))
     authenticated_user = result.scalar_one_or_none()
     if authenticated_user is None:
         raise credentials_exception
@@ -208,9 +194,7 @@ async def get_current_user_optional(
     except JWTError:
         return None
 
-    result = await db.execute(
-        select(User).where(User.username == username)
-    )
+    result = await db.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
 
 
