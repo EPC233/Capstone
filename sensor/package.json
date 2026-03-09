@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "jupyter-matplotlib": "^0.12.0",
+    "matplotlib": "^1.0.0",
+    "numpy": "^0.0.1",
+    "pandas": "^0.0.3"
+  }
+}
