@@ -20,6 +20,9 @@ import EditProfilePage from './pages/profile/EditProfilePage';
 
 // Common pages
 import HomePage from './pages/common/HomePage';
+
+// Live data page
+import LiveDataPage from './pages/livedata/LiveDataPage';
 import './globals.css';
 
 export default function App() {
@@ -60,6 +63,18 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <SessionDetailPage />
+                                </Layout>
+                            </ProtectedRoute>
+                        }
+                    />
+
+                    {/* Live data route */}
+                    <Route
+                        path="/live"
+                        element={
+                            <ProtectedRoute>
+                                <Layout>
+                                    <LiveDataPage />
                                 </Layout>
                             </ProtectedRoute>
                         }

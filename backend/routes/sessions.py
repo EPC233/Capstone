@@ -28,7 +28,7 @@ from schemas.session import (
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 # Upload directory for files
-UPLOAD_DIR = "/app/uploads"
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 

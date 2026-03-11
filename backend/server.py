@@ -25,6 +25,7 @@ from routes import (
     auth,
     friends,
     sessions,
+    serial,
 )
 
 
@@ -61,6 +62,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/api")
 app.include_router(friends.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
+app.include_router(serial.router, prefix="/api")
 
 # Serve static files (production)
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")

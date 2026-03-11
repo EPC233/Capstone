@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Install pyserial for Arduino connectivity
+RUN pip install pyserial
+
 # Install Poetry
 RUN pip install poetry
 

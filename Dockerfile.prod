@@ -40,6 +40,9 @@ COPY backend/pyproject.toml backend/poetry.lock* ./
 # Install dependencies (production only)
 RUN poetry install --no-interaction --no-ansi --only=main --no-root
 
+# Install pyserial for Arduino connectivity
+RUN pip install pyserial
+
 # Stage 3: Final Runtime Image
 FROM python:3.11-slim
 
@@ -53,7 +56,11 @@ COPY --from=backend-builder /usr/local/bin /usr/local/bin
 COPY backend/ ./backend/
 
 # Copy built frontend from frontend-builder to /app/static
+
 COPY --from=frontend-builder /app/frontend/dist ./static
+
+# Install pyserial for Arduino connectivity (runtime)
+RUN pip install pyserial
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && \

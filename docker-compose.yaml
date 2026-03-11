@@ -46,13 +46,13 @@ services:
   # React Frontend Service
   frontend:
     build:
-      context: ./ui
+      context: ./frontend
       dockerfile: Dockerfile
     container_name: fitness_tracker_frontend
     ports:
       - "5173:5173"
     volumes:
-      - ./ui:/app
+      - ./frontend:/app
       - /app/node_modules
     environment:
       - VITE_API_URL=http://localhost:8000

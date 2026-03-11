@@ -17,6 +17,7 @@ python-dotenv = "*"
 python-jose = {extras = ["cryptography"], version = "*"}
 bcrypt = "^4.0.0"
 python-multipart = "*"
+pyserial = "*"
 
 [build-system]
 requires = ["poetry-core"]
