@@ -24,6 +24,7 @@ from schemas.session import (
     AccelerometerDataResponse,
     GraphImageResponse,
 )
+from services.analysis_service import analyze_csv
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -294,6 +295,81 @@ async def upload_graph_image(
     await db.refresh(graph_image)
     
     return graph_image
+
+
+@router.get("/accelerometer/{data_id}/analyze")
+async def analyze_accelerometer_data(
+    data_id: int,
+    sample_rate: int = 100,
+    threshold: float = 0.05,
+    smooth_window: int = 11,
+    min_rep_samples: int = 20,
+    min_rom_cm: float = 3.0,
+    rest_sensitivity: float = 0.5,
+    weight_kg: float = 0.0,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Analyse an accelerometer CSV file and return rep-detection results
+    plus chart data (acceleration, velocity, position).
+    """
+    result = await db.execute(
+        select(AccelerometerData)
+        .join(Session)
+        .where(
+            AccelerometerData.id == data_id,
+            Session.user_id == current_user.id,
+        )
+    )
+    data = result.scalars().first()
+
+    if not data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Accelerometer data not found",
+        )
+
+    if not os.path.exists(data.file_path):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="CSV file not found on disk",
+        )
+
+    # Try to extract real recording duration from the description
+    # e.g. "Live recording — 518 samples, 11.16s"
+    recording_duration: float | None = None
+    if data.description:
+        import re
+        m = re.search(r"([\d.]+)s\s*$", data.description)
+        if m:
+            try:
+                recording_duration = float(m.group(1))
+            except ValueError:
+                pass
+
+    with open(data.file_path, "r") as f:
+        csv_content = f.read()
+
+    try:
+        analysis = analyze_csv(
+            csv_content,
+            sample_rate=sample_rate,
+            threshold=threshold,
+            smooth_window=smooth_window,
+            min_rep_samples=min_rep_samples,
+            min_rom_cm=min_rom_cm,
+            rest_sensitivity=rest_sensitivity,
+            weight_kg=weight_kg,
+            recording_duration_seconds=recording_duration,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        )
+
+    return analysis
 
 
 @router.delete("/accelerometer/{data_id}", status_code=204)

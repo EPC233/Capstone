@@ -8,16 +8,19 @@ package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
-sqlalchemy = {extras = ["asyncio"], version = "^2.0.29"}
 asyncpg = "*"
+bcrypt = "^4.0.0"
 fastapi = "*"
-uvicorn = {extras = ["standard"], version = "*"}
+numpy = "^2.4.3"
+pandas = "^3.0.1"
 pydantic = {extras = ["email"], version = "^2.12.5"}
+pyserial = "*"
 python-dotenv = "*"
 python-jose = {extras = ["cryptography"], version = "*"}
-bcrypt = "^4.0.0"
 python-multipart = "*"
-pyserial = "*"
+scipy = "^1.17.1"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.29"}
+uvicorn = {extras = ["standard"], version = "*"}
 
 [build-system]
 requires = ["poetry-core"]

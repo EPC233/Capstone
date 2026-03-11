@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Container,
@@ -16,6 +16,10 @@ import {
     Table,
     Anchor,
     Divider,
+    Collapse,
+    Slider,
+    Tooltip,
+    NumberInput,
 } from '@mantine/core';
 import {
     IconArrowLeft,
@@ -25,17 +29,22 @@ import {
     IconFile,
     IconPhoto,
     IconDownload,
+    IconChartLine,
+    IconRefresh,
 } from '@tabler/icons-react';
 import {
     getSession,
     deleteSession,
     deleteAccelerometerData,
     deleteGraphImage,
+    analyzeAccelerometerData,
     type Session,
     type AccelerometerData,
     type GraphImage,
+    type AnalysisResult,
 } from '../../services/sessions';
 import { getApiUrl } from '../../utils/api';
+import AccelAnalysisChart from '../../components/sessions/AccelAnalysisChart';
 
 const SESSION_TYPES: Record<string, string> = {
     running: 'Running',
@@ -54,6 +63,14 @@ export default function SessionDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    // Analysis state: keyed by accelerometer data ID
+    const [analyses, setAnalyses] = useState<Record<number, AnalysisResult>>({});
+    const [analysisOpen, setAnalysisOpen] = useState<Record<number, boolean>>({});
+    const [analysisLoading, setAnalysisLoading] = useState<Record<number, boolean>>({});
+    const [minRomCm, setMinRomCm] = useState<Record<number, number>>({});
+    const [restSensitivity, setRestSensitivity] = useState<Record<number, number>>({});
+    const [weightKg, setWeightKg] = useState<Record<number, number>>({});
 
     // Layout wrapper styles
     const layoutWrapperStyles: React.CSSProperties = {
@@ -93,6 +110,47 @@ export default function SessionDetailPage() {
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to delete session');
             setActionLoading(null);
+        }
+    }
+
+    // Handle analyze accelerometer data
+    async function handleAnalyze(dataId: number) {
+        // Toggle visibility if already loaded
+        if (analyses[dataId]) {
+            setAnalysisOpen((prev) => ({ ...prev, [dataId]: !prev[dataId] }));
+            return;
+        }
+
+        try {
+            setAnalysisLoading((prev) => ({ ...prev, [dataId]: true }));
+            setError(null);
+            const romThreshold = minRomCm[dataId] ?? 3.0;
+            const restSens = restSensitivity[dataId] ?? 0.5;
+            const weight = weightKg[dataId] ?? 0;
+            const result = await analyzeAccelerometerData(dataId, { min_rom_cm: romThreshold, rest_sensitivity: restSens, weight_kg: weight });
+            setAnalyses((prev) => ({ ...prev, [dataId]: result }));
+            setAnalysisOpen((prev) => ({ ...prev, [dataId]: true }));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Analysis failed');
+        } finally {
+            setAnalysisLoading((prev) => ({ ...prev, [dataId]: false }));
+        }
+    }
+
+    // Re-analyze with updated min_rom_cm
+    async function handleReanalyze(dataId: number) {
+        try {
+            setAnalysisLoading((prev) => ({ ...prev, [dataId]: true }));
+            setError(null);
+            const romThreshold = minRomCm[dataId] ?? 3.0;
+            const restSens = restSensitivity[dataId] ?? 0.5;
+            const weight = weightKg[dataId] ?? 0;
+            const result = await analyzeAccelerometerData(dataId, { min_rom_cm: romThreshold, rest_sensitivity: restSens, weight_kg: weight });
+            setAnalyses((prev) => ({ ...prev, [dataId]: result }));
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Re-analysis failed');
+        } finally {
+            setAnalysisLoading((prev) => ({ ...prev, [dataId]: false }));
         }
     }
 
@@ -277,7 +335,8 @@ export default function SessionDetailPage() {
                                     </Table.Thead>
                                     <Table.Tbody>
                                         {session.accelerometer_data.map((data: AccelerometerData) => (
-                                            <Table.Tr key={data.id}>
+                                            <React.Fragment key={data.id}>
+                                            <Table.Tr>
                                                 <Table.Td>
                                                     <Anchor
                                                         href={getDownloadUrl(data.file_path)}
@@ -291,6 +350,15 @@ export default function SessionDetailPage() {
                                                 <Table.Td>{formatDate(data.created_at)}</Table.Td>
                                                 <Table.Td>
                                                     <Group gap="xs">
+                                                        <ActionIcon
+                                                            variant="subtle"
+                                                            color="grape"
+                                                            onClick={() => handleAnalyze(data.id)}
+                                                            loading={analysisLoading[data.id] ?? false}
+                                                            title="Analyze"
+                                                        >
+                                                            <IconChartLine size={16} />
+                                                        </ActionIcon>
                                                         <ActionIcon
                                                             component="a"
                                                             href={getDownloadUrl(data.file_path)}
@@ -313,7 +381,108 @@ export default function SessionDetailPage() {
                                                     </Group>
                                                 </Table.Td>
                                             </Table.Tr>
-                                        ))}
+                                            {/* Inline analysis chart */}
+                                            {analyses[data.id] && (
+                                                <Table.Tr key={`analysis-${data.id}`}>
+                                                    <Table.Td colSpan={5} p={0}>
+                                                        <Collapse in={analysisOpen[data.id] ?? false}>
+                                                            <Box p="md" style={{ background: 'var(--mantine-color-gray-1)'}}>
+                                                                <Group mb="sm" align="flex-end">
+                                                                    <Box style={{ flex: 1, maxWidth: 300 }}>
+                                                                        <Text size="xs" c="black" mb={4}>
+                                                                            Min ROM threshold (cm)
+                                                                        </Text>
+                                                                        <Slider
+                                                                            value={minRomCm[data.id] ?? 3.0}
+                                                                            onChange={(val) =>
+                                                                                setMinRomCm((prev) => ({
+                                                                                    ...prev,
+                                                                                    [data.id]: val,
+                                                                                }))
+                                                                            }
+                                                                            min={0}
+                                                                            max={20}
+                                                                            step={0.5}
+                                                                            marks={[
+                                                                                { value: 0, label: '0' },
+                                                                                { value: 5, label: '5' },
+                                                                                { value: 10, label: '10' },
+                                                                                { value: 15, label: '15' },
+                                                                                { value: 20, label: '20' },
+                                                                            ]}
+                                                                            label={(val) => `${val} cm`}
+                                                                            color="grape"
+                                                                            size="sm"
+                                                                            styles={{ markLabel: { color: 'black' } }}
+                                                                        />
+                                                                    </Box>
+                                                                    <Box style={{ flex: 1, maxWidth: 300 }}>
+                                                                        <Text size="xs" c="black" mb={4}>
+                                                                            Rest detection sensitivity
+                                                                        </Text>
+                                                                        <Slider
+                                                                            value={restSensitivity[data.id] ?? 0.5}
+                                                                            onChange={(val) =>
+                                                                                setRestSensitivity((prev) => ({
+                                                                                    ...prev,
+                                                                                    [data.id]: val,
+                                                                                }))
+                                                                            }
+                                                                            min={0.1}
+                                                                            max={2.0}
+                                                                            step={0.1}
+                                                                            marks={[
+                                                                                { value: 0.1, label: '0.1' },
+                                                                                { value: 0.5, label: '0.5' },
+                                                                                { value: 1.0, label: '1.0' },
+                                                                                { value: 1.5, label: '1.5' },
+                                                                                { value: 2.0, label: '2.0' },
+                                                                            ]}
+                                                                            label={(val) => `${val}`}
+                                                                            color="teal"
+                                                                            size="sm"
+                                                                            styles={{ markLabel: { color: 'black' } }}
+                                                                        />
+                                                                    </Box>
+                                                                    <Box style={{ width: 120 }}>
+                                                                        <Text size="xs" c="black" mb={4}>
+                                                                            Weight (kg)
+                                                                        </Text>
+                                                                        <NumberInput
+                                                                            value={weightKg[data.id] ?? 0}
+                                                                            onChange={(val) =>
+                                                                                setWeightKg((prev) => ({
+                                                                                    ...prev,
+                                                                                    [data.id]: typeof val === 'number' ? val : 0,
+                                                                                }))
+                                                                            }
+                                                                            min={0}
+                                                                            max={500}
+                                                                            step={0.5}
+                                                                            decimalScale={1}
+                                                                            size="sm"
+                                                                            placeholder="0"
+                                                                        />
+                                                                    </Box>
+                                                                    <Tooltip label="Re-analyze with new threshold">
+                                                                        <ActionIcon
+                                                                            variant="light"
+                                                                            color="grape"
+                                                                            size="lg"
+                                                                            onClick={() => handleReanalyze(data.id)}
+                                                                            loading={analysisLoading[data.id] ?? false}
+                                                                        >
+                                                                            <IconRefresh size={18} />
+                                                                        </ActionIcon>
+                                                                    </Tooltip>
+                                                                </Group>
+                                                                <AccelAnalysisChart analysis={analyses[data.id]!} />
+                                                            </Box>
+                                                        </Collapse>
+                                                    </Table.Td>
+                                                </Table.Tr>
+                                            )}
+                                        </React.Fragment>))}
                                     </Table.Tbody>
                                 </Table>
                             ) : (

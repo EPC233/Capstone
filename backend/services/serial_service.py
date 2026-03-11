@@ -21,13 +21,23 @@ except ImportError:
 
 
 # Column names from the GravityCorrectedAccel sketch
-COLUMNS = [
+# New format includes timestamp_us as the first column
+COLUMNS_WITH_TS = [
+    "timestamp_us",
     "ax", "ay", "az",
     "gx", "gy", "gz",
     "qw", "qx", "qy", "qz",
     "ax_world", "ay_world", "az_world",
 ]
-EXPECTED_COLS = len(COLUMNS)
+COLUMNS_NO_TS = [
+    "ax", "ay", "az",
+    "gx", "gy", "gz",
+    "qw", "qx", "qy", "qz",
+    "ax_world", "ay_world", "az_world",
+]
+# Accept either 13 or 14 columns
+EXPECTED_COLS_NO_TS = len(COLUMNS_NO_TS)
+EXPECTED_COLS_WITH_TS = len(COLUMNS_WITH_TS)
 
 
 def find_arduino_port() -> Optional[str]:
@@ -185,7 +195,14 @@ class SerialService:
         self._recording_buffer = None
 
         duration = time.time() - buffer.start_time
-        csv_header = ",".join(COLUMNS)
+        # Detect column format: first line tells us if timestamps are present
+        has_timestamps = False
+        if buffer.lines:
+            first_parts = buffer.lines[0].split(",")
+            has_timestamps = len(first_parts) == EXPECTED_COLS_WITH_TS
+
+        cols = COLUMNS_WITH_TS if has_timestamps else COLUMNS_NO_TS
+        csv_header = ",".join(cols)
         csv_body = "\n".join(buffer.lines)
         csv_content = csv_header + "\n" + csv_body + "\n"
 
@@ -214,7 +231,7 @@ class SerialService:
     # ------------------------------------------------------------------
 
     async def _skip_header(self) -> None:
-        """Read and discard lines until we get valid 13-column numeric data."""
+        """Read and discard lines until we get valid numeric data."""
         if not self._serial:
             return
         loop = asyncio.get_event_loop()
@@ -222,7 +239,7 @@ class SerialService:
             raw = await loop.run_in_executor(None, self._serial.readline)
             line = raw.decode(errors="replace").strip()
             parts = line.split(",")
-            if len(parts) == EXPECTED_COLS:
+            if len(parts) in (EXPECTED_COLS_NO_TS, EXPECTED_COLS_WITH_TS):
                 try:
                     [float(p) for p in parts]
                     return  # Got valid data, header is past
@@ -245,7 +262,7 @@ class SerialService:
                 line = raw.decode(errors="replace").strip()
                 parts = line.split(",")
 
-                if len(parts) != EXPECTED_COLS:
+                if len(parts) not in (EXPECTED_COLS_NO_TS, EXPECTED_COLS_WITH_TS):
                     continue
 
                 try:
@@ -253,8 +270,9 @@ class SerialService:
                 except ValueError:
                     continue
 
-                # Build a JSON message
-                data_point = dict(zip(COLUMNS, values))
+                # Build a JSON message (use appropriate column list)
+                cols = COLUMNS_WITH_TS if len(parts) == EXPECTED_COLS_WITH_TS else COLUMNS_NO_TS
+                data_point = dict(zip(cols, values))
                 data_point["index"] = sample_index
                 data_point["timestamp"] = time.time()
                 sample_index += 1

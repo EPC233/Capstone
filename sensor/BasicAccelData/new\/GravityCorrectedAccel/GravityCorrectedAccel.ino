@@ -17,8 +17,10 @@ void setup() {
     while (1);
   }
 
-  Serial.println("ax,ay,az,gx,gy,gz,qw,qx,qy,qz,ax_world,ay_world,az_world");
-  filter.begin(200); // Expected sample rate (Hz)
+  // Library patched to use ±16g range (BMI270.cpp: BMI2_ACC_RANGE_16G + INT16_to_G=2048)
+
+  Serial.println("timestamp_us,ax,ay,az,gx,gy,gz,qw,qx,qy,qz,ax_world,ay_world,az_world");
+  filter.begin(100); // Actual sample rate ~100 Hz
 }
 
 void loop() {
@@ -69,6 +71,7 @@ void loop() {
     az_w *= G;
 
     // Print as CSV
+    Serial.print(now); Serial.print(",");
     Serial.print(ax, 4); Serial.print(",");
     Serial.print(ay, 4); Serial.print(",");
     Serial.print(az, 4); Serial.print(",");
