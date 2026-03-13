@@ -36,9 +36,6 @@ export default function HomeScreen() {
                         </Text>
                     </View>
 
-                    <View style={styles.emojiContainer}>
-                    </View>
-
                     <Button
                         mode="contained"
                         onPress={handleGetStarted}
@@ -78,23 +75,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontWeight: '700',
         fontSize: 32,
-    },
-    subtitle: {
-        textAlign: 'center',
-        opacity: 0.7,
-        lineHeight: 22,
-        fontSize: 18,
-    },
-    emojiContainer: {
-        flexDirection: 'row',
-        gap: designTokens.spacing.xl,
-        marginBottom: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emoji: {
-        fontSize: 48,
-        lineHeight: 48,
     },
     button: {
         marginTop: 10,

@@ -39,9 +39,6 @@ export default function HomeScreen() {
                         </Text>
                     </View>
 
-                    <View style={styles.emojiContainer}>
-                    </View>
-
                     {user && (
                         <View style={styles.welcomeSection}>
                             <Text
@@ -92,17 +89,6 @@ const styles = StyleSheet.create({
         opacity: 0.7,
         lineHeight: 22,
         fontSize: 18,
-    },
-    emojiContainer: {
-        flexDirection: 'row',
-        gap: designTokens.spacing.xl,
-        marginBottom: 40,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emoji: {
-        fontSize: 48,
-        lineHeight: 48,
     },
     welcomeSection: {
         marginTop: designTokens.spacing.xl,

@@ -4,7 +4,6 @@ import {
     Card,
     Text,
     Button,
-    Appbar,
     Avatar,
     useTheme,
     Divider,
@@ -13,7 +12,6 @@ import {
     TextInput,
     Snackbar,
 } from 'react-native-paper';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import ProtectedRoute from '../../components/ProtectedRoute';
 import { useAuth } from '../../contexts/AuthContext';
 import { designTokens } from '../../theme';
@@ -99,18 +97,6 @@ export default function ProfileScreen() {
                     { backgroundColor: theme.colors.background },
                 ]}
             >
-                {/* <Appbar.Header elevated>
-                    <Appbar.Content
-                        title="Profile"
-                        titleStyle={styles.headerTitle}
-                    />
-                    <Appbar.Action
-                        icon="pencil"
-                        onPress={openEditModal}
-                        iconColor={theme.colors.primary}
-                    />
-                </Appbar.Header> */}
-
                 <ScrollView
                     style={styles.scrollView}
                     contentContainerStyle={styles.scrollContent}
@@ -300,10 +286,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         padding: designTokens.spacing.xl,
         paddingBottom: designTokens.spacing.xxxl,
-    },
-    headerTitle: {
-        fontWeight: '600',
-        fontSize: 20,
     },
     profileCard: {
         marginBottom: designTokens.spacing.xl,

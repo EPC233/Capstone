@@ -274,7 +274,7 @@ async function apiRequest<T>(
 }
 
 /**
- * API client methods matching axios interface for easy migration
+ * API client methods
  */
 export const apiClient = {
     get: <T>(url: string, config?: RequestConfig): Promise<{ data: T }> => {

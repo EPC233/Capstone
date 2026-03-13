@@ -12,11 +12,3 @@ export interface Token {
     token_type: string;
 }
 
-export interface UserCreate {
-    username: string;
-    email: string;
-    password: string;
-    first_name?: string | null;
-    last_name?: string | null;
-    avatar_url?: string | null;
-}

@@ -1,5 +1,6 @@
 #include <Arduino_BMI270_BMM150.h>
 #include <MadgwickAHRS.h>
+#include <ArduinoBLE.h>
 
 Madgwick filter;   // Create Madgwick filter instance
 unsigned long lastUpdate = 0;
@@ -8,9 +9,27 @@ float deltat = 0.0f;  // Time between updates
 // Gravity constant
 const float G = 9.80665;
 
+// ── BLE Setup ───────────────────────────────────────────────
+// Custom UUIDs – change these if they conflict with another device
+#define IMU_SERVICE_UUID        "12345678-1234-5678-1234-56789abcdef0"
+#define IMU_CHARACTERISTIC_UUID "12345678-1234-5678-1234-56789abcdef1"
+
+BLEService imuService(IMU_SERVICE_UUID);
+
+// Binary packet: 1 uint32 (timestamp) + 13 floats = 4 + 52 = 56 bytes
+// Fields: timestamp_us | ax ay az | gx gy gz | qw qx qy qz | ax_w ay_w az_w
+const int PACKET_SIZE = sizeof(uint32_t) + 13 * sizeof(float); // 56 bytes
+BLECharacteristic imuCharacteristic(
+  IMU_CHARACTERISTIC_UUID,
+  BLERead | BLENotify,
+  PACKET_SIZE
+);
+
 void setup() {
   Serial.begin(115200);
-  while (!Serial);
+  // Brief wait for serial – don't block forever so BLE works without USB
+  unsigned long serialWait = millis();
+  while (!Serial && (millis() - serialWait < 3000));
 
   if (!IMU.begin()) {
     Serial.println("Failed to initialize IMU!");
@@ -19,11 +38,27 @@ void setup() {
 
   // Library patched to use ±16g range (BMI270.cpp: BMI2_ACC_RANGE_16G + INT16_to_G=2048)
 
+  // ── Initialize BLE ──────────────────────────────────────────
+  if (!BLE.begin()) {
+    Serial.println("Failed to initialize BLE!");
+    while (1);
+  }
+
+  BLE.setLocalName("IMU-Sensor");
+  BLE.setAdvertisedService(imuService);
+  imuService.addCharacteristic(imuCharacteristic);
+  BLE.addService(imuService);
+  BLE.advertise();
+
+  Serial.println("BLE advertising as \"IMU-Sensor\"");
   Serial.println("timestamp_us,ax,ay,az,gx,gy,gz,qw,qx,qy,qz,ax_world,ay_world,az_world");
   filter.begin(100); // Actual sample rate ~100 Hz
 }
 
 void loop() {
+  // Keep BLE stack alive (handles connections, disconnections, etc.)
+  BLE.poll();
+
   float ax, ay, az;
   float gx, gy, gz;
   unsigned long now = micros();
@@ -70,7 +105,31 @@ void loop() {
     ay_w *= G;
     az_w *= G;
 
-    // Print as CSV
+    // ── Send data over BLE ──────────────────────────────────
+    if (BLE.connected()) {
+      uint8_t packet[PACKET_SIZE];
+      int offset = 0;
+
+      uint32_t ts = (uint32_t)now;
+      memcpy(packet + offset, &ts,   sizeof(ts));   offset += sizeof(ts);
+      memcpy(packet + offset, &ax,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &ay,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &az,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &gx,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &gy,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &gz,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &qw,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &qx,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &qy,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &qz,   sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &ax_w, sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &ay_w, sizeof(float)); offset += sizeof(float);
+      memcpy(packet + offset, &az_w, sizeof(float));
+
+      imuCharacteristic.writeValue(packet, PACKET_SIZE);
+    }
+
+    // Print as CSV (still available over USB serial for debugging)
     Serial.print(now); Serial.print(",");
     Serial.print(ax, 4); Serial.print(",");
     Serial.print(ay, 4); Serial.print(",");

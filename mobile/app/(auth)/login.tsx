@@ -136,20 +136,6 @@ const styles = StyleSheet.create({
         maxWidth: 420,
         alignSelf: 'center',
     },
-    header: {
-        marginBottom: 40,
-        alignItems: 'center',
-    },
-    title: {
-        marginBottom: designTokens.spacing.md,
-        textAlign: 'center',
-        fontWeight: '700',
-    },
-    subtitle: {
-        textAlign: 'center',
-        opacity: 0.7,
-        lineHeight: 22,
-    },
     form: {
         width: '100%',
     },
