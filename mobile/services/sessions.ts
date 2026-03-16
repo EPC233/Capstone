@@ -1,25 +1,24 @@
 import api from './api';
 
-export interface Session {
-    id: number;
-    user_id: number;
-    name: string;
-    description?: string;
-    session_type?: string;
-    created_at: string;
-    updated_at: string;
-    accelerometer_data: AccelerometerData[];
-    graph_images: GraphImage[];
-}
-
 export interface AccelerometerData {
     id: number;
-    session_id: number;
+    set_id: number;
     file_name: string;
     file_path: string;
     file_size?: number;
     description?: string;
     created_at: string;
+}
+
+export interface WorkoutSet {
+    id: number;
+    session_id: number;
+    set_number: number;
+    weight_kg?: number | null;
+    status: string;
+    accelerometer_data: AccelerometerData | null;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface GraphImage {
@@ -31,6 +30,18 @@ export interface GraphImage {
     image_type?: string;
     description?: string;
     created_at: string;
+}
+
+export interface Session {
+    id: number;
+    user_id: number;
+    name: string;
+    description?: string;
+    session_type?: string;
+    created_at: string;
+    updated_at: string;
+    sets: WorkoutSet[];
+    graph_images: GraphImage[];
 }
 
 export interface CreateSessionData {
@@ -88,22 +99,40 @@ export async function deleteSession(sessionId: number): Promise<void> {
 }
 
 /**
- * Upload accelerometer CSV data for a session
+ * Create a new set for a session
+ */
+export async function createSet(
+    sessionId: number,
+    data?: { weight_kg?: number | null }
+): Promise<WorkoutSet> {
+    const response = await api.post<WorkoutSet>(`/sessions/${sessionId}/sets`, data ?? {});
+    return response.data;
+}
+
+/**
+ * Delete a set
+ */
+export async function deleteSet(setId: number): Promise<void> {
+    await api.delete(`/sessions/sets/${setId}`);
+}
+
+/**
+ * Upload accelerometer CSV data for a set
  */
 export async function uploadAccelerometerData(
-    sessionId: number,
+    setId: number,
     file: File | Blob,
     fileName: string,
     description?: string
-): Promise<AccelerometerData> {
+): Promise<WorkoutSet> {
     const formData = new FormData();
     formData.append('file', file, fileName);
     if (description) {
         formData.append('description', description);
     }
 
-    const response = await api.post<AccelerometerData>(
-        `/sessions/${sessionId}/accelerometer`,
+    const response = await api.post<WorkoutSet>(
+        `/sessions/sets/${setId}/accelerometer`,
         formData,
         {
             headers: {

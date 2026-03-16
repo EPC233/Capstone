@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Container,
@@ -29,7 +29,7 @@ import {
     IconTrash,
     IconAlertCircle,
     IconCalendar,
-    IconFile,
+    IconBarbell,
     IconPhoto,
     IconDownload,
     IconChartLine,
@@ -37,22 +37,35 @@ import {
     IconEdit,
     IconCheck,
     IconX,
+    IconActivity,
+    IconPlus,
+    IconPlayerRecord,
+    IconPlayerStop,
+    IconClipboardText,
 } from '@tabler/icons-react';
 import {
     getSession,
     updateSession,
     deleteSession,
-    deleteAccelerometerData,
+    createSet,
+    deleteSet,
     deleteGraphImage,
     analyzeAccelerometerData,
     type Session,
-    type AccelerometerData,
+    type WorkoutSet,
     type GraphImage,
     type AnalysisResult,
     type UpdateSessionData,
 } from '../../services/sessions';
 import { getApiUrl } from '../../utils/api';
 import AccelAnalysisChart from '../../components/sessions/AccelAnalysisChart';
+import { useSerialStatus } from '../../contexts/SerialStatusContext';
+import {
+    createLiveDataSocket,
+    startRecording,
+    stopRecording,
+    type AccelDataPoint,
+} from '../../services/livedata';
 
 const SESSION_TYPES: Record<string, string> = {
     bench_press: 'Bench Press',
@@ -69,6 +82,7 @@ const SESSION_TYPE_OPTIONS = [
 export default function SessionDetailPage() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const navigate = useNavigate();
+    const { status: serialStatus } = useSerialStatus();
 
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
@@ -87,6 +101,84 @@ export default function SessionDetailPage() {
     const [minRomCm, setMinRomCm] = useState<Record<number, number>>({});
     const [restSensitivity, setRestSensitivity] = useState<Record<number, number>>({});
     const [weightKg, setWeightKg] = useState<Record<number, number>>({});
+
+    // Live z-acceleration for recording mode
+    const [liveAz, setLiveAz] = useState<number | null>(null);
+    const socketRef = useRef<ReturnType<typeof createLiveDataSocket> | null>(null);
+
+    // Open / close live WebSocket when recording changes
+    useEffect(() => {
+        if (serialStatus.recording) {
+            if (!socketRef.current) {
+                const sock = createLiveDataSocket();
+                socketRef.current = sock;
+                sock.onData((point: AccelDataPoint) => {
+                    setLiveAz(point.az_world);
+                });
+                sock.onClose(() => {
+                    socketRef.current = null;
+                });
+                sock.onError(() => {
+                    socketRef.current = null;
+                });
+            }
+        } else {
+            if (socketRef.current) {
+                socketRef.current.close();
+                socketRef.current = null;
+            }
+            setLiveAz(null);
+        }
+        return () => {
+            if (socketRef.current) {
+                socketRef.current.close();
+                socketRef.current = null;
+            }
+        };
+    }, [serialStatus.recording]);
+
+    // Derive the most recent set (by set_number)
+    const lastSet: WorkoutSet | null = session?.sets?.length
+        ? [...session.sets].sort((a, b) => b.set_number - a.set_number)[0] ?? null
+        : null;
+
+    // Handle toggle recording (start / stop)
+    async function handleToggleRecording() {
+        if (!session) return;
+        try {
+            setActionLoading('record');
+            setError(null);
+
+            if (serialStatus.recording) {
+                // ── Stop recording ──
+                // The backend will reuse the last empty set or create a new one
+                await stopRecording(session.id);
+                await loadSession();
+            } else {
+                // ── Start recording ──
+                await startRecording();
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Recording failed');
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    // Handle create new blank set
+    async function handleCreateNewSet() {
+        if (!session) return;
+        try {
+            setActionLoading('new-set');
+            setError(null);
+            await createSet(session.id);
+            await loadSession();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to create new set');
+        } finally {
+            setActionLoading(null);
+        }
+    }
 
     // Layout wrapper styles
     const layoutWrapperStyles: React.CSSProperties = {
@@ -211,14 +303,14 @@ export default function SessionDetailPage() {
         }
     }
 
-    // Handle delete accelerometer data
-    async function handleDeleteAccelerometerData(dataId: number) {
+    // Handle delete set
+    async function handleDeleteSet(setId: number) {
         try {
-            setActionLoading(`accel-${dataId}`);
-            await deleteAccelerometerData(dataId);
+            setActionLoading(`set-${setId}`);
+            await deleteSet(setId);
             await loadSession();
         } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete data');
+            setError(err instanceof Error ? err.message : 'Failed to delete set');
         } finally {
             setActionLoading(null);
         }
@@ -411,7 +503,12 @@ export default function SessionDetailPage() {
                     {/* Session Info */}
                     <Card shadow="sm" padding="lg" withBorder>
                         <Stack gap="md">
-                            <Title order={4}>Session Details</Title>
+                            <Group justify="space-between">
+                                <Group gap="sm">
+                                    <IconClipboardText size={20} />
+                                    <Title order={4}>Session Details</Title>
+                                </Group>
+                            </Group>
                             {session.description && !editing && (
                                 <Text>{session.description}</Text>
                             )}
@@ -428,23 +525,132 @@ export default function SessionDetailPage() {
                             )}
                         </Stack>
                     </Card>
+                    {/* Last Set / Live Z-Accel */}
+                    <Card shadow="sm" padding="lg" withBorder>
+                        <Stack gap="md">
+                            <Group justify="space-between">
+                                <Group gap="sm">
+                                    <IconActivity size={20} />
+                                    <Title order={4}>
+                                        Active Set
+                                    </Title>
+                                    {serialStatus.recording && (
+                                        <Badge color="red" variant="dot" size="lg">
+                                            Live
+                                        </Badge>
+                                    )}
+                                </Group>
+                                <Group gap="xs">
+                                    <Button
+                                        color={serialStatus.recording ? 'gray' : 'red'}
+                                        variant={serialStatus.recording ? 'light' : 'filled'}
+                                        leftSection={
+                                            serialStatus.recording
+                                                ? <IconPlayerStop size={16} />
+                                                : <IconPlayerRecord size={16} />
+                                        }
+                                        size="compact-sm"
+                                        onClick={handleToggleRecording}
+                                        loading={actionLoading === 'record'}
+                                        disabled={!serialStatus.connected}
+                                    >
+                                        {serialStatus.recording ? 'Stop' : 'Record'}
+                                    </Button>
+                                    <Button
+                                        color="green"
+                                        leftSection={<IconPlus size={16} />}
+                                        size="compact-sm"
+                                        onClick={handleCreateNewSet}
+                                        loading={actionLoading === 'new-set'}
+                                    >
+                                        New Set
+                                    </Button>
+                                </Group>
+
+                            </Group>
+                            <Divider />
+                            {serialStatus.recording ? (
+                                <Box ta="center" py="md">
+                                    <Text size="xs" c="dimmed" mb={4}>
+                                        Z-Axis Acceleration (world frame)
+                                    </Text>
+                                    <Text
+                                        size="xl"
+                                        fw={700}
+                                        ff="monospace"
+                                        style={{ fontSize: 48 }}
+                                    >
+                                        {liveAz !== null ? `${liveAz.toFixed(3)} m/s²` : '—'}
+                                    </Text>
+                                    <Text size="sm" c="dimmed" mt="xs">
+                                        {serialStatus.recording_samples} samples recorded
+                                    </Text>
+                                </Box>
+                            ) : lastSet ? (
+                                <Group justify="space-between" align="center">
+                                    <Stack gap={4}>
+                                        <Text fw={500}>Set {lastSet.set_number}</Text>
+                                        <Text size="sm" c="dimmed">
+                                            {lastSet.accelerometer_data
+                                                ? `${formatFileSize(lastSet.accelerometer_data.file_size)} · `
+                                                : 'Empty · '}
+                                            {formatDate(lastSet.created_at)}
+                                        </Text>
+                                        {lastSet.accelerometer_data?.description && (
+                                            <Text size="sm">{lastSet.accelerometer_data.description}</Text>
+                                        )}
+                                    </Stack>
+                                    <Group gap="xs">
+                                        {lastSet.accelerometer_data && (
+                                            <>
+                                                <ActionIcon
+                                                    variant="subtle"
+                                                    color="grape"
+                                                    onClick={() => handleAnalyze(lastSet.accelerometer_data!.id)}
+                                                    loading={analysisLoading[lastSet.accelerometer_data.id] ?? false}
+                                                    title="Analyze"
+                                                >
+                                                    <IconChartLine size={16} />
+                                                </ActionIcon>
+                                                <ActionIcon
+                                                    component="a"
+                                                    href={getDownloadUrl(lastSet.accelerometer_data.file_path)}
+                                                    target="_blank"
+                                                    variant="subtle"
+                                                    color="blue"
+                                                    title="Download"
+                                                >
+                                                    <IconDownload size={16} />
+                                                </ActionIcon>
+                                            </>
+                                        )}
+                                    </Group>
+                                </Group>
+                            ) : (
+                                <Text c="dimmed" ta="center" py="md">
+                                    No sets recorded yet.
+                                </Text>
+                            )}
+                        </Stack>
+                    </Card>
 
                     {/* Sets */}
                     <Card shadow="sm" padding="lg" withBorder>
                         <Stack gap="md">
                             <Group justify="space-between">
                                 <Group gap="sm">
-                                    <IconFile size={20} />
-                                    <Title order={4}>Set Data</Title>
+                                    <IconBarbell size={20} />
+                                    <Title order={4}>Set Details</Title>
                                 </Group>
-                                <Badge>{session.accelerometer_data?.length || 0} set(s)</Badge>
+                                <Badge>{session.sets?.length || 0} set(s)</Badge>
                             </Group>
                             <Divider />
-                            {session.accelerometer_data?.length > 0 ? (
+                            {session.sets?.length > 0 ? (
                                 <Table striped highlightOnHover>
                                     <Table.Thead>
                                         <Table.Tr>
                                             <Table.Th>Set</Table.Th>
+                                            <Table.Th>Status</Table.Th>
                                             <Table.Th>Size</Table.Th>
                                             <Table.Th>Description</Table.Th>
                                             <Table.Th>Recorded</Table.Th>
@@ -452,45 +658,61 @@ export default function SessionDetailPage() {
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
-                                        {[...session.accelerometer_data]
-                                            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-                                            .map((data: AccelerometerData, index: number) => (
-                                            <React.Fragment key={data.id}>
+                                        {[...session.sets]
+                                            .sort((a, b) => a.set_number - b.set_number)
+                                            .map((s: WorkoutSet) => {
+                                            const accel = s.accelerometer_data;
+                                            const dataId = accel?.id;
+                                            return (
+                                            <React.Fragment key={s.id}>
                                             <Table.Tr>
                                                 <Table.Td>
                                                     <Text fw={500}>
-                                                        Set {index + 1}
+                                                        Set {s.set_number}
                                                     </Text>
                                                 </Table.Td>
-                                                <Table.Td>{formatFileSize(data.file_size)}</Table.Td>
-                                                <Table.Td>{data.description || '-'}</Table.Td>
-                                                <Table.Td>{formatDate(data.created_at)}</Table.Td>
+                                                <Table.Td>
+                                                    <Badge
+                                                        color={s.status === 'complete' ? 'green' : s.status === 'recording' ? 'red' : 'gray'}
+                                                        size="sm"
+                                                        variant="light"
+                                                    >
+                                                        {s.status}
+                                                    </Badge>
+                                                </Table.Td>
+                                                <Table.Td>{accel ? formatFileSize(accel.file_size) : '-'}</Table.Td>
+                                                <Table.Td>{accel?.description || '-'}</Table.Td>
+                                                <Table.Td>{formatDate(s.created_at)}</Table.Td>
                                                 <Table.Td>
                                                     <Group gap="xs">
-                                                        <ActionIcon
-                                                            variant="subtle"
-                                                            color="grape"
-                                                            onClick={() => handleAnalyze(data.id)}
-                                                            loading={analysisLoading[data.id] ?? false}
-                                                            title="Analyze"
-                                                        >
-                                                            <IconChartLine size={16} />
-                                                        </ActionIcon>
-                                                        <ActionIcon
-                                                            component="a"
-                                                            href={getDownloadUrl(data.file_path)}
-                                                            target="_blank"
-                                                            variant="subtle"
-                                                            color="blue"
-                                                            title="Download"
-                                                        >
-                                                            <IconDownload size={16} />
-                                                        </ActionIcon>
+                                                        {accel && dataId && (
+                                                            <>
+                                                                <ActionIcon
+                                                                    variant="subtle"
+                                                                    color="grape"
+                                                                    onClick={() => handleAnalyze(dataId)}
+                                                                    loading={analysisLoading[dataId] ?? false}
+                                                                    title="Analyze"
+                                                                >
+                                                                    <IconChartLine size={16} />
+                                                                </ActionIcon>
+                                                                <ActionIcon
+                                                                    component="a"
+                                                                    href={getDownloadUrl(accel.file_path)}
+                                                                    target="_blank"
+                                                                    variant="subtle"
+                                                                    color="blue"
+                                                                    title="Download"
+                                                                >
+                                                                    <IconDownload size={16} />
+                                                                </ActionIcon>
+                                                            </>
+                                                        )}
                                                         <ActionIcon
                                                             color="red"
                                                             variant="subtle"
-                                                            onClick={() => handleDeleteAccelerometerData(data.id)}
-                                                            loading={actionLoading === `accel-${data.id}`}
+                                                            onClick={() => handleDeleteSet(s.id)}
+                                                            loading={actionLoading === `set-${s.id}`}
                                                             title="Delete"
                                                         >
                                                             <IconTrash size={16} />
@@ -499,10 +721,10 @@ export default function SessionDetailPage() {
                                                 </Table.Td>
                                             </Table.Tr>
                                             {/* Inline analysis chart */}
-                                            {analyses[data.id] && (
-                                                <Table.Tr key={`analysis-${data.id}`}>
-                                                    <Table.Td colSpan={5} p={0}>
-                                                        <Collapse in={analysisOpen[data.id] ?? false}>
+                                            {dataId && analyses[dataId] && (
+                                                <Table.Tr key={`analysis-${dataId}`}>
+                                                    <Table.Td colSpan={6} p={0}>
+                                                        <Collapse in={analysisOpen[dataId] ?? false}>
                                                             <Box p="md" style={{ background: 'var(--mantine-color-gray-1)'}}>
                                                                 <Group mb="sm" align="flex-end">
                                                                     <Box style={{ flex: 1, maxWidth: 300 }}>
@@ -510,11 +732,11 @@ export default function SessionDetailPage() {
                                                                             Min ROM threshold (cm)
                                                                         </Text>
                                                                         <Slider
-                                                                            value={minRomCm[data.id] ?? 3.0}
+                                                                            value={minRomCm[dataId] ?? 3.0}
                                                                             onChange={(val) =>
                                                                                 setMinRomCm((prev) => ({
                                                                                     ...prev,
-                                                                                    [data.id]: val,
+                                                                                    [dataId]: val,
                                                                                 }))
                                                                             }
                                                                             min={0}
@@ -538,11 +760,11 @@ export default function SessionDetailPage() {
                                                                             Rest detection sensitivity
                                                                         </Text>
                                                                         <Slider
-                                                                            value={restSensitivity[data.id] ?? 0.5}
+                                                                            value={restSensitivity[dataId] ?? 0.5}
                                                                             onChange={(val) =>
                                                                                 setRestSensitivity((prev) => ({
                                                                                     ...prev,
-                                                                                    [data.id]: val,
+                                                                                    [dataId]: val,
                                                                                 }))
                                                                             }
                                                                             min={0.1}
@@ -566,11 +788,11 @@ export default function SessionDetailPage() {
                                                                             Weight (kg)
                                                                         </Text>
                                                                         <NumberInput
-                                                                            value={weightKg[data.id] ?? 0}
+                                                                            value={weightKg[dataId] ?? 0}
                                                                             onChange={(val) =>
                                                                                 setWeightKg((prev) => ({
                                                                                     ...prev,
-                                                                                    [data.id]: typeof val === 'number' ? val : 0,
+                                                                                    [dataId]: typeof val === 'number' ? val : 0,
                                                                                 }))
                                                                             }
                                                                             min={0}
@@ -586,20 +808,22 @@ export default function SessionDetailPage() {
                                                                             variant="light"
                                                                             color="grape"
                                                                             size="lg"
-                                                                            onClick={() => handleReanalyze(data.id)}
-                                                                            loading={analysisLoading[data.id] ?? false}
+                                                                            onClick={() => handleReanalyze(dataId)}
+                                                                            loading={analysisLoading[dataId] ?? false}
                                                                         >
                                                                             <IconRefresh size={18} />
                                                                         </ActionIcon>
                                                                     </Tooltip>
                                                                 </Group>
-                                                                <AccelAnalysisChart analysis={analyses[data.id]!} />
+                                                                <AccelAnalysisChart analysis={analyses[dataId]!} />
                                                             </Box>
                                                         </Collapse>
                                                     </Table.Td>
                                                 </Table.Tr>
                                             )}
-                                        </React.Fragment>))}
+                                        </React.Fragment>
+                                            );
+                                        })}
                                     </Table.Tbody>
                                 </Table>
                             ) : (

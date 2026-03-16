@@ -1,25 +1,26 @@
 import { getApiUrl } from '../utils/api';
 
-export interface Session {
-    id: number;
-    user_id: number;
-    name: string;
-    description?: string;
-    session_type?: string;
-    created_at: string;
-    updated_at: string;
-    accelerometer_data: AccelerometerData[];
-    graph_images: GraphImage[];
-}
+// ---- Types -----------------------------------------------------------------
 
 export interface AccelerometerData {
     id: number;
-    session_id: number;
+    set_id: number;
     file_name: string;
     file_path: string;
     file_size?: number;
     description?: string;
     created_at: string;
+}
+
+export interface WorkoutSet {
+    id: number;
+    session_id: number;
+    set_number: number;
+    weight_kg?: number | null;
+    status: string; // "empty" | "recording" | "complete"
+    accelerometer_data: AccelerometerData | null;
+    created_at: string;
+    updated_at: string;
 }
 
 export interface GraphImage {
@@ -33,6 +34,18 @@ export interface GraphImage {
     created_at: string;
 }
 
+export interface Session {
+    id: number;
+    user_id: number;
+    name: string;
+    description?: string;
+    session_type?: string;
+    created_at: string;
+    updated_at: string;
+    sets: WorkoutSet[];
+    graph_images: GraphImage[];
+}
+
 export interface CreateSessionData {
     name: string;
     description?: string;
@@ -44,6 +57,12 @@ export interface UpdateSessionData {
     description?: string;
     session_type?: string;
 }
+
+export interface CreateSetData {
+    weight_kg?: number | null;
+}
+
+// ---- Helpers ---------------------------------------------------------------
 
 function getAuthHeaders(includeContentType = true): Record<string, string> {
     const token = localStorage.getItem('auth_token');
@@ -70,9 +89,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
     return response.json() as Promise<T>;
 }
 
-/**
- * Get all sessions for the current user
- */
+// ---- Session CRUD ----------------------------------------------------------
+
 export async function getSessions(): Promise<Session[]> {
     const response = await fetch(`${getApiUrl()}/sessions`, {
         headers: getAuthHeaders(),
@@ -80,9 +98,6 @@ export async function getSessions(): Promise<Session[]> {
     return handleResponse<Session[]>(response);
 }
 
-/**
- * Get a specific session by ID
- */
 export async function getSession(sessionId: number): Promise<Session> {
     const response = await fetch(`${getApiUrl()}/sessions/${sessionId}`, {
         headers: getAuthHeaders(),
@@ -90,9 +105,6 @@ export async function getSession(sessionId: number): Promise<Session> {
     return handleResponse<Session>(response);
 }
 
-/**
- * Create a new session
- */
 export async function createSession(data: CreateSessionData): Promise<Session> {
     const response = await fetch(`${getApiUrl()}/sessions`, {
         method: 'POST',
@@ -102,9 +114,6 @@ export async function createSession(data: CreateSessionData): Promise<Session> {
     return handleResponse<Session>(response);
 }
 
-/**
- * Update a session
- */
 export async function updateSession(
     sessionId: number,
     data: UpdateSessionData
@@ -117,9 +126,6 @@ export async function updateSession(
     return handleResponse<Session>(response);
 }
 
-/**
- * Delete a session
- */
 export async function deleteSession(sessionId: number): Promise<void> {
     const response = await fetch(`${getApiUrl()}/sessions/${sessionId}`, {
         method: 'DELETE',
@@ -128,31 +134,59 @@ export async function deleteSession(sessionId: number): Promise<void> {
     await handleResponse<void>(response);
 }
 
-/**
- * Upload accelerometer CSV data for a session
- */
-export async function uploadAccelerometerData(
+// ---- Set CRUD --------------------------------------------------------------
+
+export async function createSet(
     sessionId: number,
+    data?: CreateSetData,
+): Promise<WorkoutSet> {
+    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}/sets`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data ?? {}),
+    });
+    return handleResponse<WorkoutSet>(response);
+}
+
+export async function deleteSet(setId: number): Promise<void> {
+    const response = await fetch(`${getApiUrl()}/sessions/sets/${setId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+    });
+    await handleResponse<void>(response);
+}
+
+// ---- Accelerometer data (attached to a Set) --------------------------------
+
+export async function uploadAccelerometerData(
+    setId: number,
     file: File,
     description?: string
-): Promise<AccelerometerData> {
+): Promise<WorkoutSet> {
     const formData = new FormData();
     formData.append('file', file);
     if (description) {
         formData.append('description', description);
     }
 
-    const response = await fetch(`${getApiUrl()}/sessions/${sessionId}/accelerometer`, {
+    const response = await fetch(`${getApiUrl()}/sessions/sets/${setId}/accelerometer`, {
         method: 'POST',
-        headers: getAuthHeaders(false), // No Content-Type for FormData
+        headers: getAuthHeaders(false),
         body: formData,
     });
-    return handleResponse<AccelerometerData>(response);
+    return handleResponse<WorkoutSet>(response);
 }
 
-/**
- * Upload a graph image for a session
- */
+export async function deleteAccelerometerData(dataId: number): Promise<void> {
+    const response = await fetch(`${getApiUrl()}/sessions/accelerometer/${dataId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+    });
+    await handleResponse<void>(response);
+}
+
+// ---- Graph images ----------------------------------------------------------
+
 export async function uploadGraphImage(
     sessionId: number,
     file: File,
@@ -166,26 +200,12 @@ export async function uploadGraphImage(
 
     const response = await fetch(`${getApiUrl()}/sessions/${sessionId}/graph`, {
         method: 'POST',
-        headers: getAuthHeaders(false), // No Content-Type for FormData
+        headers: getAuthHeaders(false),
         body: formData,
     });
     return handleResponse<GraphImage>(response);
 }
 
-/**
- * Delete accelerometer data
- */
-export async function deleteAccelerometerData(dataId: number): Promise<void> {
-    const response = await fetch(`${getApiUrl()}/sessions/accelerometer/${dataId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders(),
-    });
-    await handleResponse<void>(response);
-}
-
-/**
- * Delete graph image
- */
 export async function deleteGraphImage(imageId: number): Promise<void> {
     const response = await fetch(`${getApiUrl()}/sessions/graph/${imageId}`, {
         method: 'DELETE',
@@ -194,7 +214,7 @@ export async function deleteGraphImage(imageId: number): Promise<void> {
     await handleResponse<void>(response);
 }
 
-// ---- Analysis types & API ----
+// ---- Analysis types & API --------------------------------------------------
 
 export interface PhaseInfo {
     start_sample: number;
@@ -242,9 +262,6 @@ export interface AnalysisResult {
     rep_boundaries: { start: number; end: number }[];
 }
 
-/**
- * Analyze an accelerometer CSV file and get rep detection + chart data
- */
 export async function analyzeAccelerometerData(
     dataId: number,
     params?: {

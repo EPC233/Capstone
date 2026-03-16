@@ -87,7 +87,7 @@ function SessionsContent() {
                             )}
                             <View style={styles.statsRow}>
                                 <Text style={styles.statText}>
-                                    {item.accelerometer_data.length} data files
+                                    {item.sets.length} set(s)
                                 </Text>
                                 <Text style={styles.statText}>
                                     {item.graph_images.length} graphs

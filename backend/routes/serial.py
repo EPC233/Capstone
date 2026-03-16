@@ -23,6 +23,7 @@ from auth import get_current_active_user
 from database import get_db
 from models.user import User
 from models.session import Session
+from models.set import Set
 from models.accelerometer_data import AccelerometerData
 from services.serial_service import serial_service, list_serial_ports
 
@@ -115,13 +116,28 @@ async def stop_recording(
         if session is None:
             result["save_error"] = "Session not found or not owned by user"
         else:
-            # Determine set number based on existing accelerometer data in this session
-            count_stmt = select(AccelerometerData).where(
-                AccelerometerData.session_id == session_id
-            )
+            # Determine set number based on existing sets
+            count_stmt = select(Set).where(Set.session_id == session_id)
             count_result = await db.execute(count_stmt)
-            existing_count = len(count_result.scalars().all())
-            set_number = existing_count + 1
+            existing_sets = count_result.scalars().all()
+
+            # If the last set is empty, reuse it; otherwise create a new one
+            last_empty = None
+            for s in sorted(existing_sets, key=lambda x: x.set_number, reverse=True):
+                if s.status == "empty":
+                    last_empty = s
+                    break
+
+            if last_empty:
+                new_set = last_empty
+            else:
+                new_set = Set(
+                    session_id=session_id,
+                    set_number=len(existing_sets) + 1,
+                    status="recording",
+                )
+                db.add(new_set)
+                await db.flush()
 
             timestamp = datetime.utcnow().timestamp()
             file_name = f"recording_{session_id}_{timestamp:.0f}.csv"
@@ -130,18 +146,35 @@ async def stop_recording(
             with open(file_path, "w") as f:
                 f.write(csv_content)
 
+            # Remove existing accel data on the set if present (e.g. reused empty set)
+            if new_set.id:
+                old_accel = await db.execute(
+                    select(AccelerometerData).where(
+                        AccelerometerData.set_id == new_set.id
+                    )
+                )
+                old = old_accel.scalars().first()
+                if old:
+                    if os.path.exists(old.file_path):
+                        os.remove(old.file_path)
+                    await db.delete(old)
+                    await db.flush()
+
             accel_data = AccelerometerData(
-                session_id=session_id,
+                set_id=new_set.id,
                 file_name=file_name,
                 file_path=file_path,
                 file_size=len(csv_content.encode()),
-                description=f"Set {set_number} — {result.get('sample_count', 0)} samples, {result.get('duration_seconds', 0)}s",
+                description=f"Set {new_set.set_number} — {result.get('sample_count', 0)} samples, {result.get('duration_seconds', 0)}s",
             )
             db.add(accel_data)
+            new_set.status = "complete"
+            new_set.updated_at = datetime.utcnow()
             await db.commit()
             await db.refresh(accel_data)
 
             result["saved_to_session"] = session_id
+            result["set_id"] = new_set.id
             result["accelerometer_data_id"] = accel_data.id
 
     return result

@@ -32,10 +32,11 @@ class Session(Base):
 
     # Relationships
     user = relationship("User", back_populates="sessions")
-    accelerometer_data = relationship(
-        "AccelerometerData",
+    sets = relationship(
+        "Set",
         back_populates="session",
         cascade="all, delete-orphan",
+        order_by="Set.set_number",
     )
     graph_images = relationship(
         "GraphImage", back_populates="session", cascade="all, delete-orphan"

@@ -190,9 +190,9 @@ export default function SessionsPage() {
                             </Text>
                         </Group>
                         <Group gap="xs">
-                            {session.accelerometer_data?.length > 0 && (
+                            {session.sets?.length > 0 && (
                                 <Badge size="sm" variant="outline">
-                                    {session.accelerometer_data.length} set(s)
+                                    {session.sets.length} set(s)
                                 </Badge>
                             )}
                             {session.graph_images?.length > 0 && (

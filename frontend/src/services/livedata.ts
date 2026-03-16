@@ -32,6 +32,7 @@ export interface RecordingStopResult {
     sample_count?: number;
     duration_seconds?: number;
     saved_to_session?: number;
+    set_id?: number;
     accelerometer_data_id?: number;
     detail?: string;
     save_error?: string;

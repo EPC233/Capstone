@@ -2,22 +2,22 @@
 #include <MadgwickAHRS.h>
 #include <ArduinoBLE.h>
 
-Madgwick filter;   // Create Madgwick filter instance
+Madgwick filter;   // Initialize Madgwick filter (defaults: beta=0.1, sampleFreq=100 Hz)
 unsigned long lastUpdate = 0;
-float deltat = 0.0f;  // Time between updates
+float deltat = 0.0f;  // Refresh rate in seconds
 
-// Gravity constant
+// Gravity
 const float G = 9.80665;
 
-// ── BLE Setup ───────────────────────────────────────────────
-// Custom UUIDs – change these if they conflict with another device
+// Bluetooth _____________________________________________________________________
 #define IMU_SERVICE_UUID        "12345678-1234-5678-1234-56789abcdef0"
 #define IMU_CHARACTERISTIC_UUID "12345678-1234-5678-1234-56789abcdef1"
 
 BLEService imuService(IMU_SERVICE_UUID);
 
 // Binary packet: 1 uint32 (timestamp) + 13 floats = 4 + 52 = 56 bytes
-// Fields: timestamp_us | ax ay az | gx gy gz | qw qx qy qz | ax_w ay_w az_w
+// Fields: timestamp_us | ax ay az | gx gy gz | qw qx qy qz             | ax_w ay_w az_w
+//                      | accel    | gyro     | orientation quaternion  | gravity-corrected accel in world frame
 const int PACKET_SIZE = sizeof(uint32_t) + 13 * sizeof(float); // 56 bytes
 BLECharacteristic imuCharacteristic(
   IMU_CHARACTERISTIC_UUID,
@@ -27,7 +27,6 @@ BLECharacteristic imuCharacteristic(
 
 void setup() {
   Serial.begin(115200);
-  // Brief wait for serial – don't block forever so BLE works without USB
   unsigned long serialWait = millis();
   while (!Serial && (millis() - serialWait < 3000));
 
@@ -36,7 +35,6 @@ void setup() {
     while (1);
   }
 
-  // Library patched to use ±16g range (BMI270.cpp: BMI2_ACC_RANGE_16G + INT16_to_G=2048)
 
   // ── Initialize BLE ──────────────────────────────────────────
   if (!BLE.begin()) {

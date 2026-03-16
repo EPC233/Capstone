@@ -15,15 +15,16 @@ from auth import get_current_active_user
 from database import get_db
 from models.user import User
 from models.session import Session
+from models.set import Set
 from models.accelerometer_data import AccelerometerData
 from models.graph_image import GraphImage
 from schemas.session import (
     SessionCreate,
     SessionResponse,
     SessionUpdate,
-    AccelerometerDataResponse,
     GraphImageResponse,
 )
+from schemas.set import SetCreate, SetResponse
 from services.analysis_service import analyze_csv
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -33,15 +34,26 @@ UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.d
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+def _session_query_options():
+    """Common joinedload options for session queries."""
+    return [
+        joinedload(Session.sets).joinedload(Set.accelerometer_data),
+        joinedload(Session.graph_images),
+    ]
+
+
+# ------------------------------------------------------------------
+# Session CRUD
+# ------------------------------------------------------------------
+
+
 @router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(
     session_data: SessionCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Create a new session for the current user.
-    """
+    """Create a new session for the current user."""
     session = Session(
         user_id=current_user.id,
         name=session_data.name,
@@ -50,15 +62,11 @@ async def create_session(
     )
     db.add(session)
     await db.commit()
-    
-    # Reload with relationships to avoid lazy loading issues
+
     result = await db.execute(
         select(Session)
         .where(Session.id == session.id)
-        .options(
-            joinedload(Session.accelerometer_data),
-            joinedload(Session.graph_images)
-        )
+        .options(*_session_query_options())
     )
     return result.scalars().unique().one()
 
@@ -68,20 +76,14 @@ async def get_user_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Get all sessions for the current user.
-    """
+    """Get all sessions for the current user."""
     result = await db.execute(
         select(Session)
         .where(Session.user_id == current_user.id)
-        .options(
-            joinedload(Session.accelerometer_data),
-            joinedload(Session.graph_images)
-        )
+        .options(*_session_query_options())
         .order_by(Session.created_at.desc())
     )
-    sessions = result.scalars().unique().all()
-    return sessions
+    return result.scalars().unique().all()
 
 
 @router.get("/{session_id}", response_model=SessionResponse)
@@ -90,25 +92,15 @@ async def get_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Get a specific session by ID.
-    """
+    """Get a specific session by ID."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
-        .options(
-            joinedload(Session.accelerometer_data),
-            joinedload(Session.graph_images)
-        )
+        .options(*_session_query_options())
     )
     session = result.scalars().first()
-    
     if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
-        )
-    
+        raise HTTPException(status_code=404, detail="Session not found")
     return session
 
 
@@ -119,41 +111,29 @@ async def update_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Update a session.
-    """
+    """Update a session."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
     )
     session = result.scalars().first()
-    
     if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
-        )
-    
-    # Update fields
+        raise HTTPException(status_code=404, detail="Session not found")
+
     if session_data.name is not None:
         session.name = session_data.name
     if session_data.description is not None:
         session.description = session_data.description
     if session_data.session_type is not None:
         session.session_type = session_data.session_type
-    
     session.updated_at = datetime.utcnow()
-    
+
     await db.commit()
-    
-    # Reload with relationships to avoid lazy loading issues
+
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id)
-        .options(
-            joinedload(Session.accelerometer_data),
-            joinedload(Session.graph_images)
-        )
+        .options(*_session_query_options())
     )
     return result.scalars().unique().one()
 
@@ -164,137 +144,149 @@ async def delete_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Delete a session and all associated data.
-    """
+    """Delete a session and all associated data."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
     )
     session = result.scalars().first()
-    
     if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
-        )
-    
+        raise HTTPException(status_code=404, detail="Session not found")
     await db.delete(session)
     await db.commit()
     return None
 
 
-@router.post("/{session_id}/accelerometer", response_model=AccelerometerDataResponse, status_code=201)
+# ------------------------------------------------------------------
+# Set CRUD
+# ------------------------------------------------------------------
+
+
+@router.post("/{session_id}/sets", response_model=SetResponse, status_code=201)
+async def create_set(
+    session_id: int,
+    set_data: SetCreate = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Create a new empty set for a session."""
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
+    )
+    session = result.scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Determine set number
+    count_result = await db.execute(
+        select(Set).where(Set.session_id == session_id)
+    )
+    existing_count = len(count_result.scalars().all())
+
+    new_set = Set(
+        session_id=session_id,
+        set_number=existing_count + 1,
+        weight_kg=set_data.weight_kg if set_data else None,
+        status="empty",
+    )
+    db.add(new_set)
+    await db.commit()
+
+    result = await db.execute(
+        select(Set)
+        .where(Set.id == new_set.id)
+        .options(joinedload(Set.accelerometer_data))
+    )
+    return result.scalars().unique().one()
+
+
+@router.delete("/sets/{set_id}", status_code=204)
+async def delete_set(
+    set_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Delete a set and its accelerometer data."""
+    result = await db.execute(
+        select(Set)
+        .join(Session)
+        .where(Set.id == set_id, Session.user_id == current_user.id)
+        .options(joinedload(Set.accelerometer_data))
+    )
+    s = result.scalars().first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    # Remove file from disk if present
+    if s.accelerometer_data and os.path.exists(s.accelerometer_data.file_path):
+        os.remove(s.accelerometer_data.file_path)
+
+    await db.delete(s)
+    await db.commit()
+    return None
+
+
+# ------------------------------------------------------------------
+# Accelerometer data (attached to a Set)
+# ------------------------------------------------------------------
+
+
+@router.post("/sets/{set_id}/accelerometer", response_model=SetResponse, status_code=201)
 async def upload_accelerometer_data(
-    session_id: int,
+    set_id: int,
     file: UploadFile = File(...),
     description: str = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Upload accelerometer CSV data for a session.
-    """
-    # Verify session exists and belongs to user
+    """Upload accelerometer CSV data for a set."""
     result = await db.execute(
-        select(Session)
-        .where(Session.id == session_id, Session.user_id == current_user.id)
+        select(Set)
+        .join(Session)
+        .where(Set.id == set_id, Session.user_id == current_user.id)
+        .options(joinedload(Set.accelerometer_data))
     )
-    session = result.scalars().first()
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
-        )
-    
-    # Validate file type
-    if not file.filename.endswith('.csv'):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only CSV files are allowed"
-        )
-    
-    # Save file
-    file_path = os.path.join(UPLOAD_DIR, f"accel_{session_id}_{datetime.utcnow().timestamp()}_{file.filename}")
+    s = result.scalars().first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are allowed")
+
+    # Remove existing accel data if overwriting
+    if s.accelerometer_data:
+        if os.path.exists(s.accelerometer_data.file_path):
+            os.remove(s.accelerometer_data.file_path)
+        await db.delete(s.accelerometer_data)
+        await db.flush()
+
+    file_path = os.path.join(
+        UPLOAD_DIR,
+        f"accel_{s.session_id}_{datetime.utcnow().timestamp()}_{file.filename}",
+    )
     contents = await file.read()
-    
     with open(file_path, "wb") as f:
         f.write(contents)
-    
-    # Create database record
+
     accel_data = AccelerometerData(
-        session_id=session_id,
+        set_id=set_id,
         file_name=file.filename,
         file_path=file_path,
         file_size=len(contents),
         description=description,
     )
-    
     db.add(accel_data)
+    s.status = "complete"
+    s.updated_at = datetime.utcnow()
     await db.commit()
-    await db.refresh(accel_data)
-    
-    return accel_data
 
-
-@router.post("/{session_id}/graph", response_model=GraphImageResponse, status_code=201)
-async def upload_graph_image(
-    session_id: int,
-    file: UploadFile = File(...),
-    description: str = Form(None),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    Upload a graph image for a session.
-    """
-    # Verify session exists and belongs to user
     result = await db.execute(
-        select(Session)
-        .where(Session.id == session_id, Session.user_id == current_user.id)
+        select(Set)
+        .where(Set.id == set_id)
+        .options(joinedload(Set.accelerometer_data))
     )
-    session = result.scalars().first()
-    
-    if not session:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Session not found"
-        )
-    
-    # Validate file type
-    allowed_extensions = ['.png', '.jpg', '.jpeg', '.svg', '.gif']
-    if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only image files (png, jpg, jpeg, svg, gif) are allowed"
-        )
-    
-    # Determine image type
-    image_type = file.filename.split('.')[-1].lower()
-    
-    # Save file
-    file_path = os.path.join(UPLOAD_DIR, f"graph_{session_id}_{datetime.utcnow().timestamp()}_{file.filename}")
-    contents = await file.read()
-    
-    with open(file_path, "wb") as f:
-        f.write(contents)
-    
-    # Create database record
-    graph_image = GraphImage(
-        session_id=session_id,
-        file_name=file.filename,
-        file_path=file_path,
-        file_size=len(contents),
-        image_type=image_type,
-        description=description,
-    )
-    
-    db.add(graph_image)
-    await db.commit()
-    await db.refresh(graph_image)
-    
-    return graph_image
+    return result.scalars().unique().one()
 
 
 @router.get("/accelerometer/{data_id}/analyze")
@@ -310,12 +302,10 @@ async def analyze_accelerometer_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Analyse an accelerometer CSV file and return rep-detection results
-    plus chart data (acceleration, velocity, position).
-    """
+    """Analyse an accelerometer CSV file and return rep-detection results."""
     result = await db.execute(
         select(AccelerometerData)
+        .join(Set)
         .join(Session)
         .where(
             AccelerometerData.id == data_id,
@@ -323,24 +313,16 @@ async def analyze_accelerometer_data(
         )
     )
     data = result.scalars().first()
-
     if not data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Accelerometer data not found",
-        )
-
+        raise HTTPException(status_code=404, detail="Accelerometer data not found")
     if not os.path.exists(data.file_path):
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="CSV file not found on disk",
-        )
+        raise HTTPException(status_code=404, detail="CSV file not found on disk")
 
     # Try to extract real recording duration from the description
-    # e.g. "Live recording — 518 samples, 11.16s"
     recording_duration: float | None = None
     if data.description:
         import re
+
         m = re.search(r"([\d.]+)s\s*$", data.description)
         if m:
             try:
@@ -364,10 +346,7 @@ async def analyze_accelerometer_data(
             recording_duration_seconds=recording_duration,
         )
     except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        )
+        raise HTTPException(status_code=422, detail=str(exc))
 
     return analysis
 
@@ -378,32 +357,87 @@ async def delete_accelerometer_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Delete accelerometer data file.
-    """
+    """Delete accelerometer data file."""
     result = await db.execute(
         select(AccelerometerData)
+        .join(Set)
         .join(Session)
         .where(
             AccelerometerData.id == data_id,
-            Session.user_id == current_user.id
+            Session.user_id == current_user.id,
         )
     )
     data = result.scalars().first()
-    
     if not data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Accelerometer data not found"
-        )
-    
-    # Delete file from filesystem
+        raise HTTPException(status_code=404, detail="Accelerometer data not found")
+
+    # Also mark the parent set back to empty
+    set_result = await db.execute(
+        select(Set).where(Set.id == data.set_id)
+    )
+    parent_set = set_result.scalars().first()
+    if parent_set:
+        parent_set.status = "empty"
+        parent_set.updated_at = datetime.utcnow()
+
     if os.path.exists(data.file_path):
         os.remove(data.file_path)
-    
+
     await db.delete(data)
     await db.commit()
     return None
+
+
+# ------------------------------------------------------------------
+# Graph images (still attached to Session)
+# ------------------------------------------------------------------
+
+
+@router.post("/{session_id}/graph", response_model=GraphImageResponse, status_code=201)
+async def upload_graph_image(
+    session_id: int,
+    file: UploadFile = File(...),
+    description: str = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Upload a graph image for a session."""
+    result = await db.execute(
+        select(Session)
+        .where(Session.id == session_id, Session.user_id == current_user.id)
+    )
+    session = result.scalars().first()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    allowed_extensions = [".png", ".jpg", ".jpeg", ".svg", ".gif"]
+    if not any(file.filename.lower().endswith(ext) for ext in allowed_extensions):
+        raise HTTPException(
+            status_code=400,
+            detail="Only image files (png, jpg, jpeg, svg, gif) are allowed",
+        )
+
+    image_type = file.filename.split(".")[-1].lower()
+    file_path = os.path.join(
+        UPLOAD_DIR,
+        f"graph_{session_id}_{datetime.utcnow().timestamp()}_{file.filename}",
+    )
+    contents = await file.read()
+    with open(file_path, "wb") as f:
+        f.write(contents)
+
+    graph_image = GraphImage(
+        session_id=session_id,
+        file_name=file.filename,
+        file_path=file_path,
+        file_size=len(contents),
+        image_type=image_type,
+        description=description,
+    )
+    db.add(graph_image)
+    await db.commit()
+    await db.refresh(graph_image)
+    return graph_image
 
 
 @router.delete("/graph/{image_id}", status_code=204)
@@ -412,29 +446,19 @@ async def delete_graph_image(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Delete graph image file.
-    """
+    """Delete graph image file."""
     result = await db.execute(
         select(GraphImage)
         .join(Session)
-        .where(
-            GraphImage.id == image_id,
-            Session.user_id == current_user.id
-        )
+        .where(GraphImage.id == image_id, Session.user_id == current_user.id)
     )
     image = result.scalars().first()
-    
     if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Graph image not found"
-        )
-    
-    # Delete file from filesystem
+        raise HTTPException(status_code=404, detail="Graph image not found")
+
     if os.path.exists(image.file_path):
         os.remove(image.file_path)
-    
+
     await db.delete(image)
     await db.commit()
     return None

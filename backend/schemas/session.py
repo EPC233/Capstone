@@ -7,22 +7,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-
-# Accelerometer Data Schemas
-class AccelerometerDataBase(BaseModel):
-    description: Optional[str] = None
-
-
-class AccelerometerDataResponse(AccelerometerDataBase):
-    id: int
-    session_id: int
-    file_name: str
-    file_path: str
-    file_size: Optional[int] = None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
+from .set import SetResponse
 
 
 # Graph Image Schemas
@@ -65,7 +50,7 @@ class SessionResponse(SessionBase):
     user_id: int
     created_at: datetime
     updated_at: datetime
-    accelerometer_data: List[AccelerometerDataResponse] = []
+    sets: List[SetResponse] = []
     graph_images: List[GraphImageResponse] = []
 
     class Config:
