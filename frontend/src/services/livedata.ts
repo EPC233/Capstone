@@ -131,9 +131,11 @@ export async function startRecording(): Promise<{ status: string }> {
 
 export async function stopRecording(
     sessionId?: number,
+    setId?: number,
 ): Promise<RecordingStopResult> {
     const params = new URLSearchParams();
     if (sessionId !== undefined) params.set('session_id', String(sessionId));
+    if (setId !== undefined) params.set('set_id', String(setId));
 
     const res = await fetch(
         `${API}/serial/record/stop?${params.toString()}`,

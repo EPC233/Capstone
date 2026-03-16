@@ -90,12 +90,14 @@ async def start_recording(
 @router.post("/record/stop")
 async def stop_recording(
     session_id: int = Query(None, description="Session ID to save recording to"),
+    set_id: int = Query(None, description="Existing set ID to overwrite with new recording data"),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Stop recording and optionally save the CSV to a session.
     If session_id is provided, the CSV is saved as accelerometer data on that session.
+    If set_id is also provided, the recording overwrites that specific set's data.
     """
     result = await serial_service.stop_recording()
 
@@ -116,28 +118,40 @@ async def stop_recording(
         if session is None:
             result["save_error"] = "Session not found or not owned by user"
         else:
-            # Determine set number based on existing sets
-            count_stmt = select(Set).where(Set.session_id == session_id)
-            count_result = await db.execute(count_stmt)
-            existing_sets = count_result.scalars().all()
-
-            # If the last set is empty, reuse it; otherwise create a new one
-            last_empty = None
-            for s in sorted(existing_sets, key=lambda x: x.set_number, reverse=True):
-                if s.status == "empty":
-                    last_empty = s
-                    break
-
-            if last_empty:
-                new_set = last_empty
-            else:
-                new_set = Set(
-                    session_id=session_id,
-                    set_number=len(existing_sets) + 1,
-                    status="recording",
+            # If a specific set_id was provided, look it up directly
+            if set_id is not None:
+                set_stmt = select(Set).where(
+                    Set.id == set_id, Set.session_id == session_id
                 )
-                db.add(new_set)
-                await db.flush()
+                set_result = await db.execute(set_stmt)
+                target_set = set_result.scalars().first()
+                if target_set is None:
+                    result["save_error"] = "Set not found or does not belong to this session"
+                    return result
+                new_set = target_set
+            else:
+                # Determine set number based on existing sets
+                count_stmt = select(Set).where(Set.session_id == session_id)
+                count_result = await db.execute(count_stmt)
+                existing_sets = count_result.scalars().all()
+
+                # If the last set is empty, reuse it; otherwise create a new one
+                last_empty = None
+                for s in sorted(existing_sets, key=lambda x: x.set_number, reverse=True):
+                    if s.status == "empty":
+                        last_empty = s
+                        break
+
+                if last_empty:
+                    new_set = last_empty
+                else:
+                    new_set = Set(
+                        session_id=session_id,
+                        set_number=len(existing_sets) + 1,
+                        status="recording",
+                    )
+                    db.add(new_set)
+                    await db.flush()
 
             timestamp = datetime.utcnow().timestamp()
             file_name = f"recording_{session_id}_{timestamp:.0f}.csv"

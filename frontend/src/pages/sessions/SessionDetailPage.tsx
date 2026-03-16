@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Container,
@@ -59,9 +59,9 @@ import {
 } from '../../services/sessions';
 import { getApiUrl } from '../../utils/api';
 import AccelAnalysisChart from '../../components/sessions/AccelAnalysisChart';
+import LiveAccelChart from '../../components/sessions/LiveAccelChart';
 import { useSerialStatus } from '../../contexts/SerialStatusContext';
 import {
-    createLiveDataSocket,
     startRecording,
     stopRecording,
     type AccelDataPoint,
@@ -104,37 +104,19 @@ export default function SessionDetailPage() {
 
     // Live z-acceleration for recording mode
     const [liveAz, setLiveAz] = useState<number | null>(null);
-    const socketRef = useRef<ReturnType<typeof createLiveDataSocket> | null>(null);
 
-    // Open / close live WebSocket when recording changes
+    // Track which set we are recording into (null = default / active-set behavior)
+    const [recordingSetId, setRecordingSetId] = useState<number | null>(null);
+
+    // Stable callback for LiveAccelChart – updates liveAz on each data point
+    const handleLiveData = useMemo(
+        () => (point: AccelDataPoint) => setLiveAz(point.az_world),
+        [],
+    );
+
+    // Reset liveAz when recording stops
     useEffect(() => {
-        if (serialStatus.recording) {
-            if (!socketRef.current) {
-                const sock = createLiveDataSocket();
-                socketRef.current = sock;
-                sock.onData((point: AccelDataPoint) => {
-                    setLiveAz(point.az_world);
-                });
-                sock.onClose(() => {
-                    socketRef.current = null;
-                });
-                sock.onError(() => {
-                    socketRef.current = null;
-                });
-            }
-        } else {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-            setLiveAz(null);
-        }
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-        };
+        if (!serialStatus.recording) setLiveAz(null);
     }, [serialStatus.recording]);
 
     // Derive the most recent set (by set_number)
@@ -152,10 +134,35 @@ export default function SessionDetailPage() {
             if (serialStatus.recording) {
                 // ── Stop recording ──
                 // The backend will reuse the last empty set or create a new one
-                await stopRecording(session.id);
+                await stopRecording(session.id, recordingSetId ?? undefined);
+                setRecordingSetId(null);
                 await loadSession();
             } else {
                 // ── Start recording ──
+                await startRecording();
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Recording failed');
+        } finally {
+            setActionLoading(null);
+        }
+    }
+
+    // Handle toggle recording for a specific set (overwrite)
+    async function handleRecordToSet(setId: number) {
+        if (!session) return;
+        try {
+            setActionLoading('record');
+            setError(null);
+
+            if (serialStatus.recording) {
+                // Already recording – stop and save to the tracked set
+                await stopRecording(session.id, recordingSetId ?? undefined);
+                setRecordingSetId(null);
+                await loadSession();
+            } else {
+                // Start recording, remembering which set to target on stop
+                setRecordingSetId(setId);
                 await startRecording();
             }
         } catch (err) {
@@ -570,22 +577,21 @@ export default function SessionDetailPage() {
                             </Group>
                             <Divider />
                             {serialStatus.recording ? (
-                                <Box ta="center" py="md">
-                                    <Text size="xs" c="dimmed" mb={4}>
-                                        Z-Axis Acceleration (world frame)
-                                    </Text>
-                                    <Text
-                                        size="xl"
-                                        fw={700}
-                                        ff="monospace"
-                                        style={{ fontSize: 48 }}
-                                    >
-                                        {liveAz !== null ? `${liveAz.toFixed(3)} m/s²` : '—'}
-                                    </Text>
-                                    <Text size="sm" c="dimmed" mt="xs">
-                                        {serialStatus.recording_samples} samples recorded
-                                    </Text>
-                                </Box>
+                                <Stack gap="xs">
+                                    <LiveAccelChart
+                                        active={serialStatus.recording}
+                                        height={200}
+                                        onData={handleLiveData}
+                                    />
+                                    <Group justify="space-between" px="xs">
+                                        <Text size="sm" c="dimmed">
+                                            {liveAz !== null ? `Z: ${liveAz.toFixed(3)} m/s²` : '—'}
+                                        </Text>
+                                        <Text size="sm" c="dimmed">
+                                            {serialStatus.recording_samples} samples recorded
+                                        </Text>
+                                    </Group>
+                                </Stack>
                             ) : lastSet ? (
                                 <Group justify="space-between" align="center">
                                     <Stack gap={4}>
@@ -653,7 +659,7 @@ export default function SessionDetailPage() {
                                             <Table.Th>Status</Table.Th>
                                             <Table.Th>Size</Table.Th>
                                             <Table.Th>Description</Table.Th>
-                                            <Table.Th>Recorded</Table.Th>
+                                            <Table.Th>Created</Table.Th>
                                             <Table.Th>Actions</Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
@@ -685,6 +691,18 @@ export default function SessionDetailPage() {
                                                 <Table.Td>{formatDate(s.created_at)}</Table.Td>
                                                 <Table.Td>
                                                     <Group gap="xs">
+                                                        <ActionIcon
+                                                            color={serialStatus.recording && recordingSetId === s.id ? 'gray' : 'red'}
+                                                            variant={serialStatus.recording && recordingSetId === s.id ? 'light' : 'subtle'}
+                                                            onClick={() => handleRecordToSet(s.id)}
+                                                            loading={actionLoading === 'record' && (recordingSetId === s.id || (!serialStatus.recording && recordingSetId === null))}
+                                                            disabled={!serialStatus.connected || (serialStatus.recording && recordingSetId !== s.id)}
+                                                            title={serialStatus.recording && recordingSetId === s.id ? 'Stop recording' : 'Record to this set'}
+                                                        >
+                                                            {serialStatus.recording && recordingSetId === s.id
+                                                                ? <IconPlayerStop size={16} />
+                                                                : <IconPlayerRecord size={16} />}
+                                                        </ActionIcon>
                                                         {accel && dataId && (
                                                             <>
                                                                 <ActionIcon

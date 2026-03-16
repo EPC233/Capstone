@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Container,
     Title,
@@ -11,7 +11,6 @@ import {
     Select,
     Alert,
     Badge,
-    Paper,
 } from '@mantine/core';
 import {
     IconPlugConnected,
@@ -23,6 +22,7 @@ import {
     IconActivity,
     IconDeviceFloppy,
 } from '@tabler/icons-react';
+import LiveAccelChart from '../../components/sessions/LiveAccelChart';
 import {
     getSerialPorts,
     getSerialStatus,
@@ -30,15 +30,11 @@ import {
     disconnectSerial,
     startRecording,
     stopRecording,
-    createLiveDataSocket,
     type SerialPort,
     type SerialStatus,
     type AccelDataPoint,
 } from '../../services/livedata';
 import { getSessions, type Session } from '../../services/sessions';
-
-// How many samples to keep in the chart buffer
-const MAX_CHART_POINTS = 300;
 
 export default function LiveDataPage() {
     // Connection state
@@ -52,10 +48,6 @@ export default function LiveDataPage() {
     // Live data
     const [latestPoint, setLatestPoint] = useState<AccelDataPoint | null>(null);
     const [sampleCount, setSampleCount] = useState(0);
-    const chartBuffer = useRef<AccelDataPoint[]>([]);
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
-    const socketRef = useRef<ReturnType<typeof createLiveDataSocket> | null>(null);
-    const animFrameRef = useRef<number>(0);
 
     // Recording
     const [sessions, setSessions] = useState<Session[]>([]);
@@ -93,174 +85,15 @@ export default function LiveDataPage() {
         refreshSessions();
     }, [refreshStatus, refreshSessions]);
 
-    // ---- WebSocket management ----
-    const openSocket = useCallback(() => {
-        if (socketRef.current) return;
-        const sock = createLiveDataSocket();
-        socketRef.current = sock;
-        sock.onData((point) => {
+    // Stable callback for LiveAccelChart
+    const handleChartData = useMemo(
+        () => (point: AccelDataPoint) => {
             setLatestPoint(point);
             setSampleCount((c) => c + 1);
-            chartBuffer.current.push(point);
-            if (chartBuffer.current.length > MAX_CHART_POINTS) {
-                chartBuffer.current = chartBuffer.current.slice(-MAX_CHART_POINTS);
-            }
-        });
-        sock.onClose(() => {
-            socketRef.current = null;
-        });
-        sock.onError(() => {
-            socketRef.current = null;
-        });
-    }, []);
+        },
+        [],
+    );
 
-    const closeSocket = useCallback(() => {
-        if (socketRef.current) {
-            socketRef.current.close();
-            socketRef.current = null;
-        }
-    }, []);
-
-    // Open/close socket when connection status changes
-    useEffect(() => {
-        if (status?.connected) {
-            openSocket();
-        } else {
-            closeSocket();
-        }
-        return () => closeSocket();
-    }, [status?.connected, openSocket, closeSocket]);
-
-    // ---- Canvas chart rendering ----
-    useEffect(() => {
-        const draw = () => {
-            const canvas = canvasRef.current;
-            if (!canvas) {
-                animFrameRef.current = requestAnimationFrame(draw);
-                return;
-            }
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-                animFrameRef.current = requestAnimationFrame(draw);
-                return;
-            }
-
-            const dpr = window.devicePixelRatio || 1;
-            const rect = canvas.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
-            ctx.scale(dpr, dpr);
-
-            const W = rect.width;
-            const H = rect.height;
-
-            // Background
-            ctx.fillStyle = '#1a1b1e';
-            ctx.fillRect(0, 0, W, H);
-
-            const buf = chartBuffer.current;
-            if (buf.length < 2) {
-                ctx.fillStyle = '#666';
-                ctx.font = '14px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('Waiting for data…', W / 2, H / 2);
-                animFrameRef.current = requestAnimationFrame(draw);
-                return;
-            }
-
-            // We'll plot az_world (primary), ax_world, ay_world
-            const channels: { key: keyof AccelDataPoint; color: string; label: string }[] = [
-                { key: 'az_world', color: '#40c057', label: 'Z (vertical)' },
-                { key: 'ax_world', color: '#228be6', label: 'X' },
-                { key: 'ay_world', color: '#fa5252', label: 'Y' },
-            ];
-
-            // Auto-scale Y
-            let minVal = Infinity;
-            let maxVal = -Infinity;
-            for (const p of buf) {
-                for (const ch of channels) {
-                    const v = p[ch.key] as number;
-                    if (v < minVal) minVal = v;
-                    if (v > maxVal) maxVal = v;
-                }
-            }
-            const yPad = Math.max(Math.abs(maxVal - minVal) * 0.15, 0.5);
-            minVal -= yPad;
-            maxVal += yPad;
-
-            const xStep = W / (MAX_CHART_POINTS - 1);
-            const startIdx = MAX_CHART_POINTS - buf.length;
-
-            // Grid
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 0.5;
-            // Zero line
-            const zeroY = H - ((0 - minVal) / (maxVal - minVal)) * H;
-            ctx.beginPath();
-            ctx.moveTo(0, zeroY);
-            ctx.lineTo(W, zeroY);
-            ctx.stroke();
-
-            // Y-axis labels
-            ctx.fillStyle = '#888';
-            ctx.font = '11px monospace';
-            ctx.textAlign = 'left';
-            ctx.fillText(`${maxVal.toFixed(1)} m/s²`, 4, 14);
-            ctx.fillText(`${minVal.toFixed(1)} m/s²`, 4, H - 4);
-            ctx.fillText('0', 4, zeroY - 4);
-
-            // Draw each channel
-            for (const ch of channels) {
-                ctx.strokeStyle = ch.color;
-                ctx.lineWidth = 1.5;
-                ctx.beginPath();
-                for (let i = 0; i < buf.length; i++) {
-                    const x = (startIdx + i) * xStep;
-                    const point = buf[i];
-                    if (!point) continue;
-                    const v = point[ch.key] as number;
-                    const y = H - ((v - minVal) / (maxVal - minVal)) * H;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
-            }
-
-            // Legend
-            let lx = W - 140;
-            const ly = 14;
-            for (const ch of channels) {
-                ctx.fillStyle = ch.color;
-                ctx.fillRect(lx, ly - 8, 12, 3);
-                ctx.fillStyle = '#ccc';
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText(ch.label, lx + 16, ly);
-                lx += 0; // stack vertically
-            }
-            // Redo legend vertically
-            ctx.clearRect(W - 130, 2, 128, channels.length * 16 + 4);
-            ctx.fillStyle = 'rgba(26,27,30,0.85)';
-            ctx.fillRect(W - 130, 2, 128, channels.length * 16 + 4);
-            for (let ci = 0; ci < channels.length; ci++) {
-                const ch = channels[ci];
-                if (!ch) continue;
-                const yPos = 16 + ci * 16;
-                ctx.fillStyle = ch.color;
-                ctx.fillRect(W - 124, yPos - 6, 14, 3);
-                ctx.fillStyle = '#ccc';
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText(ch.label, W - 106, yPos);
-            }
-
-            animFrameRef.current = requestAnimationFrame(draw);
-        };
-
-        animFrameRef.current = requestAnimationFrame(draw);
-        return () => cancelAnimationFrame(animFrameRef.current);
-    }, []);
 
     // Periodically update recording sample count
     useEffect(() => {
@@ -285,7 +118,6 @@ export default function LiveDataPage() {
             const res = await connectSerial(selectedPort || undefined);
             if (res.status === 'connected' || res.status === 'already_connected') {
                 setSuccess(`Connected to ${res.port}`);
-                chartBuffer.current = [];
                 setSampleCount(0);
             } else {
                 setError(res.detail || 'Connection failed');
@@ -302,11 +134,9 @@ export default function LiveDataPage() {
         setLoading(true);
         setError(null);
         setSuccess(null);
-        closeSocket();
         try {
             await disconnectSerial();
             setSuccess('Disconnected');
-            chartBuffer.current = [];
             setSampleCount(0);
             setLatestPoint(null);
             await refreshStatus();
@@ -530,22 +360,11 @@ export default function LiveDataPage() {
                                 </Text>
                             )}
                         </Group>
-                        <Paper
-                            radius="md"
-                            style={{
-                                overflow: 'hidden',
-                                background: '#1a1b1e',
-                            }}
-                        >
-                            <canvas
-                                ref={canvasRef}
-                                style={{
-                                    width: '100%',
-                                    height: 300,
-                                    display: 'block',
-                                }}
-                            />
-                        </Paper>
+                        <LiveAccelChart
+                            active={connected}
+                            height={300}
+                            onData={handleChartData}
+                        />
                     </Stack>
                 </Card>
 
