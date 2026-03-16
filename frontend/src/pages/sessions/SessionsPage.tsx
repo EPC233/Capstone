@@ -25,6 +25,7 @@ import {
     IconAlertCircle,
     IconCalendar,
     IconChevronRight,
+    IconSearch,
 } from '@tabler/icons-react';
 import {
     getSessions,
@@ -35,12 +36,9 @@ import {
 } from '../../services/sessions';
 
 const SESSION_TYPES = [
-    { value: 'running', label: 'Running' },
-    { value: 'cycling', label: 'Cycling' },
-    { value: 'swimming', label: 'Swimming' },
-    { value: 'weightlifting', label: 'Weightlifting' },
-    { value: 'yoga', label: 'Yoga' },
-    { value: 'other', label: 'Other' },
+    { value: 'bench_press', label: 'Bench Press' },
+    { value: 'deadlift', label: 'Deadlift' },
+    { value: 'squat', label: 'Squat' },
 ];
 
 export default function SessionsPage() {
@@ -51,6 +49,10 @@ export default function SessionsPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<number | null>(null);
+
+    // Filter & search state
+    const [filterType, setFilterType] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Modal state
     const [createModalOpened, { open: openCreateModal, close: closeCreateModal }] = useDisclosure(false);
@@ -135,6 +137,17 @@ export default function SessionsPage() {
         });
     }
 
+    // Filtered sessions
+    const filteredSessions = sessions.filter((s) => {
+        const matchesType = !filterType || s.session_type === filterType;
+        const query = searchQuery.toLowerCase().trim();
+        const matchesSearch =
+            !query ||
+            s.name.toLowerCase().includes(query) ||
+            (s.description && s.description.toLowerCase().includes(query));
+        return matchesType && matchesSearch;
+    });
+
     // Get session type label
     function getSessionTypeLabel(type?: string) {
         if (!type) return null;
@@ -179,7 +192,7 @@ export default function SessionsPage() {
                         <Group gap="xs">
                             {session.accelerometer_data?.length > 0 && (
                                 <Badge size="sm" variant="outline">
-                                    {session.accelerometer_data.length} data file(s)
+                                    {session.accelerometer_data.length} set(s)
                                 </Badge>
                             )}
                             {session.graph_images?.length > 0 && (
@@ -237,6 +250,25 @@ export default function SessionsPage() {
                         </Button>
                     </Group>
 
+                    {/* Search & Filter */}
+                    <Group gap="sm" align="flex-end">
+                        <TextInput
+                            leftSection={<IconSearch size={16} />}
+                            placeholder="Search sessions..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.currentTarget.value)}
+                            style={{ flex: 1, maxWidth: 350 }}
+                        />
+                        <Select
+                            placeholder="All types"
+                            data={SESSION_TYPES}
+                            value={filterType}
+                            onChange={setFilterType}
+                            clearable
+                            style={{ maxWidth: 200 }}
+                        />
+                    </Group>
+
                     {error && (
                         <Alert
                             icon={<IconAlertCircle size={16} />}
@@ -251,22 +283,26 @@ export default function SessionsPage() {
 
                     {/* Sessions List */}
                     <Stack gap="sm">
-                        {sessions.length === 0 ? (
+                        {filteredSessions.length === 0 ? (
                             <Card shadow="sm" padding="xl" withBorder>
                                 <Stack align="center" gap="md">
                                     <Text c="dimmed" ta="center">
-                                        You don't have any sessions yet.
+                                        {sessions.length === 0
+                                            ? "You don't have any sessions yet."
+                                            : 'No sessions match the selected filter.'}
                                     </Text>
-                                    <Button
-                                        leftSection={<IconPlus size={16} />}
-                                        onClick={openCreateModal}
-                                    >
-                                        Create Your First Session
-                                    </Button>
+                                    {sessions.length === 0 && (
+                                        <Button
+                                            leftSection={<IconPlus size={16} />}
+                                            onClick={openCreateModal}
+                                        >
+                                            Create Your First Session
+                                        </Button>
+                                    )}
                                 </Stack>
                             </Card>
                         ) : (
-                            sessions.map(renderSessionCard)
+                            filteredSessions.map(renderSessionCard)
                         )}
                     </Stack>
                 </Stack>
@@ -282,7 +318,7 @@ export default function SessionsPage() {
                 <Stack gap="md">
                     <TextInput
                         label="Session Name"
-                        placeholder="Morning Run"
+                        placeholder="Enter session name"
                         required
                         value={newSession.name}
                         onChange={(e) =>

@@ -13,6 +13,7 @@ import {
 import { useMediaQuery } from '@mantine/hooks';
 import { IconLogout, IconUser, IconChevronDown } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
+import ConnectionIndicator from './ConnectionIndicator';
 
 interface NavLink {
     label: string;
@@ -144,17 +145,20 @@ export default function Navbar() {
                     wrap="nowrap"
                     gap="md"
                 >
-                    {/* Logo */}
-                    <Text
-                        fw={700}
-                        size="lg"
-                        component={Link}
-                        to="/"
-                        c="blue.6"
-                        style={{ textDecoration: 'none', flexShrink: 0 }}
-                    >
-                        Fitness Tracker
-                    </Text>
+                    {/* Connection status + Logo */}
+                    <Group gap="md" wrap="nowrap" align="center">
+                        <ConnectionIndicator />
+                        <Text
+                            fw={700}
+                            size="lg"
+                            component={Link}
+                            to="/"
+                            c="blue.6"
+                            style={{ textDecoration: 'none', flexShrink: 0 }}
+                        >
+                            Fitness Tracker
+                        </Text>
+                    </Group>
 
                     {/* Navigation Links and User Menu */}
                     <Group gap="md" wrap="nowrap">

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SerialStatusProvider } from './contexts/SerialStatusContext';
 import ProtectedRoute from './components/auth/ProtectedRoute.tsx';
 import Layout from './components/layout/Layout.tsx';
 
@@ -29,6 +30,7 @@ export default function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
+                <SerialStatusProvider>
                 <Routes>
                     {/* Public routes */}
                     <Route path="/login" element={<LoginPage />} />
@@ -120,6 +122,7 @@ export default function App() {
                         element={<Navigate to="/" replace />}
                     />
                 </Routes>
+                </SerialStatusProvider>
             </AuthProvider>
         </BrowserRouter>
     );

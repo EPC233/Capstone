@@ -115,6 +115,14 @@ async def stop_recording(
         if session is None:
             result["save_error"] = "Session not found or not owned by user"
         else:
+            # Determine set number based on existing accelerometer data in this session
+            count_stmt = select(AccelerometerData).where(
+                AccelerometerData.session_id == session_id
+            )
+            count_result = await db.execute(count_stmt)
+            existing_count = len(count_result.scalars().all())
+            set_number = existing_count + 1
+
             timestamp = datetime.utcnow().timestamp()
             file_name = f"recording_{session_id}_{timestamp:.0f}.csv"
             file_path = os.path.join(UPLOAD_DIR, file_name)
@@ -127,7 +135,7 @@ async def stop_recording(
                 file_name=file_name,
                 file_path=file_path,
                 file_size=len(csv_content.encode()),
-                description=f"Live recording — {result.get('sample_count', 0)} samples, {result.get('duration_seconds', 0)}s",
+                description=f"Set {set_number} — {result.get('sample_count', 0)} samples, {result.get('duration_seconds', 0)}s",
             )
             db.add(accel_data)
             await db.commit()

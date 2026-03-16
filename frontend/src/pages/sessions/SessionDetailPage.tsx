@@ -20,6 +20,9 @@ import {
     Slider,
     Tooltip,
     NumberInput,
+    TextInput,
+    Textarea,
+    Select,
 } from '@mantine/core';
 import {
     IconArrowLeft,
@@ -31,9 +34,13 @@ import {
     IconDownload,
     IconChartLine,
     IconRefresh,
+    IconEdit,
+    IconCheck,
+    IconX,
 } from '@tabler/icons-react';
 import {
     getSession,
+    updateSession,
     deleteSession,
     deleteAccelerometerData,
     deleteGraphImage,
@@ -42,18 +49,22 @@ import {
     type AccelerometerData,
     type GraphImage,
     type AnalysisResult,
+    type UpdateSessionData,
 } from '../../services/sessions';
 import { getApiUrl } from '../../utils/api';
 import AccelAnalysisChart from '../../components/sessions/AccelAnalysisChart';
 
 const SESSION_TYPES: Record<string, string> = {
-    running: 'Running',
-    cycling: 'Cycling',
-    swimming: 'Swimming',
-    weightlifting: 'Weightlifting',
-    yoga: 'Yoga',
-    other: 'Other',
+    bench_press: 'Bench Press',
+    deadlift: 'Deadlift',
+    squat: 'Squat',
 };
+
+const SESSION_TYPE_OPTIONS = [
+    { value: 'bench_press', label: 'Bench Press' },
+    { value: 'deadlift', label: 'Deadlift' },
+    { value: 'squat', label: 'Squat' },
+];
 
 export default function SessionDetailPage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -63,6 +74,11 @@ export default function SessionDetailPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+    // Edit state
+    const [editing, setEditing] = useState(false);
+    const [editData, setEditData] = useState<UpdateSessionData>({});
+    const [editLoading, setEditLoading] = useState(false);
 
     // Analysis state: keyed by accelerometer data ID
     const [analyses, setAnalyses] = useState<Record<number, AnalysisResult>>({});
@@ -98,6 +114,47 @@ export default function SessionDetailPage() {
     useEffect(() => {
         loadSession();
     }, [loadSession]);
+
+    // Start editing
+    function startEditing() {
+        if (!session) return;
+        setEditData({
+            name: session.name,
+            description: session.description || '',
+            session_type: session.session_type || '',
+        });
+        setEditing(true);
+    }
+
+    // Cancel editing
+    function cancelEditing() {
+        setEditing(false);
+        setEditData({});
+    }
+
+    // Save edits
+    async function handleSaveEdit() {
+        if (!session) return;
+        if (!editData.name?.trim()) {
+            setError('Session name is required');
+            return;
+        }
+        try {
+            setEditLoading(true);
+            setError(null);
+            const updated = await updateSession(session.id, {
+                name: editData.name.trim(),
+                description: editData.description?.trim() || undefined,
+                session_type: editData.session_type || undefined,
+            });
+            setSession(updated);
+            setEditing(false);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to update session');
+        } finally {
+            setEditLoading(false);
+        }
+    }
 
     // Handle delete session
     async function handleDeleteSession() {
@@ -258,14 +315,75 @@ export default function SessionDetailPage() {
                             >
                                 Back to Sessions
                             </Button>
-                            <Group gap="md" align="center">
-                                <Title order={1}>{session.name}</Title>
-                                {session.session_type && (
-                                    <Badge color="blue" size="lg">
-                                        {SESSION_TYPES[session.session_type] || session.session_type}
-                                    </Badge>
-                                )}
-                            </Group>
+                            {editing ? (
+                                <Stack gap="sm">
+                                    <TextInput
+                                        label="Session Name"
+                                        value={editData.name || ''}
+                                        onChange={(e) =>
+                                            setEditData({ ...editData, name: e.currentTarget.value })
+                                        }
+                                        required
+                                        style={{ minWidth: 300 }}
+                                    />
+                                    <Select
+                                        label="Session Type"
+                                        placeholder="Select type"
+                                        data={SESSION_TYPE_OPTIONS}
+                                        value={editData.session_type || null}
+                                        onChange={(value) =>
+                                            setEditData({ ...editData, session_type: value || '' })
+                                        }
+                                        clearable
+                                        style={{ minWidth: 300 }}
+                                    />
+                                    <Textarea
+                                        label="Description"
+                                        placeholder="Optional description..."
+                                        value={editData.description || ''}
+                                        onChange={(e) =>
+                                            setEditData({ ...editData, description: e.currentTarget.value })
+                                        }
+                                        minRows={2}
+                                        style={{ minWidth: 300 }}
+                                    />
+                                    <Group gap="xs">
+                                        <Button
+                                            size="sm"
+                                            leftSection={<IconCheck size={16} />}
+                                            onClick={handleSaveEdit}
+                                            loading={editLoading}
+                                        >
+                                            Save
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="subtle"
+                                            leftSection={<IconX size={16} />}
+                                            onClick={cancelEditing}
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </Group>
+                                </Stack>
+                            ) : (
+                                <Group gap="md" align="center">
+                                    <Title order={1}>{session.name}</Title>
+                                    {session.session_type && (
+                                        <Badge color="blue" size="lg">
+                                            {SESSION_TYPES[session.session_type] || session.session_type}
+                                        </Badge>
+                                    )}
+                                    <ActionIcon
+                                        variant="subtle"
+                                        color="gray"
+                                        onClick={startEditing}
+                                        title="Edit session"
+                                    >
+                                        <IconEdit size={18} />
+                                    </ActionIcon>
+                                </Group>
+                            )}
                         </Stack>
                         <Button
                             color="red"
@@ -294,7 +412,7 @@ export default function SessionDetailPage() {
                     <Card shadow="sm" padding="lg" withBorder>
                         <Stack gap="md">
                             <Title order={4}>Session Details</Title>
-                            {session.description && (
+                            {session.description && !editing && (
                                 <Text>{session.description}</Text>
                             )}
                             <Group gap="xs">
@@ -311,39 +429,38 @@ export default function SessionDetailPage() {
                         </Stack>
                     </Card>
 
-                    {/* Accelerometer Data */}
+                    {/* Sets */}
                     <Card shadow="sm" padding="lg" withBorder>
                         <Stack gap="md">
                             <Group justify="space-between">
                                 <Group gap="sm">
                                     <IconFile size={20} />
-                                    <Title order={4}>Accelerometer Data</Title>
+                                    <Title order={4}>Set Data</Title>
                                 </Group>
-                                <Badge>{session.accelerometer_data?.length || 0} file(s)</Badge>
+                                <Badge>{session.accelerometer_data?.length || 0} set(s)</Badge>
                             </Group>
                             <Divider />
                             {session.accelerometer_data?.length > 0 ? (
                                 <Table striped highlightOnHover>
                                     <Table.Thead>
                                         <Table.Tr>
-                                            <Table.Th>File Name</Table.Th>
+                                            <Table.Th>Set</Table.Th>
                                             <Table.Th>Size</Table.Th>
                                             <Table.Th>Description</Table.Th>
-                                            <Table.Th>Uploaded</Table.Th>
+                                            <Table.Th>Recorded</Table.Th>
                                             <Table.Th>Actions</Table.Th>
                                         </Table.Tr>
                                     </Table.Thead>
                                     <Table.Tbody>
-                                        {session.accelerometer_data.map((data: AccelerometerData) => (
+                                        {[...session.accelerometer_data]
+                                            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                                            .map((data: AccelerometerData, index: number) => (
                                             <React.Fragment key={data.id}>
                                             <Table.Tr>
                                                 <Table.Td>
-                                                    <Anchor
-                                                        href={getDownloadUrl(data.file_path)}
-                                                        target="_blank"
-                                                    >
-                                                        {data.file_name}
-                                                    </Anchor>
+                                                    <Text fw={500}>
+                                                        Set {index + 1}
+                                                    </Text>
                                                 </Table.Td>
                                                 <Table.Td>{formatFileSize(data.file_size)}</Table.Td>
                                                 <Table.Td>{data.description || '-'}</Table.Td>
@@ -487,7 +604,7 @@ export default function SessionDetailPage() {
                                 </Table>
                             ) : (
                                 <Text c="dimmed" ta="center" py="md">
-                                    No accelerometer data uploaded yet.
+                                    No sets recorded yet.
                                 </Text>
                             )}
                         </Stack>
