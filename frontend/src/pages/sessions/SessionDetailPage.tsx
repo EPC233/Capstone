@@ -16,12 +16,14 @@ import {
     deleteSession,
     createSet,
     deleteSet,
+    updateSet,
     deleteGraphImage,
     analyzeAccelerometerData,
     type Session,
     type WorkoutSet,
     type AnalysisResult,
     type UpdateSessionData,
+    type UpdateSetData,
 } from '../../services/sessions';
 import { useSerialStatus } from '../../contexts/SerialStatusContext';
 import {
@@ -64,6 +66,9 @@ export default function SessionDetailPage() {
     // Track which set we are recording into (null = default / active-set behavior)
     const [recordingSetId, setRecordingSetId] = useState<number | null>(null);
 
+    // Track user-selected active set (null = default to most recent)
+    const [selectedSetId, setSelectedSetId] = useState<number | null>(null);
+
     // Stable callback for LiveAccelChart – updates liveAz on each data point
     const handleLiveData = useMemo(
         () => (point: AccelDataPoint) => setLiveAz(point.az_world),
@@ -75,9 +80,11 @@ export default function SessionDetailPage() {
         if (!serialStatus.recording) setLiveAz(null);
     }, [serialStatus.recording]);
 
-    // Derive the most recent set (by set_number)
+    // Derive active set: user-selected or most recent by set_number
     const lastSet: WorkoutSet | null = session?.sets?.length
-        ? [...session.sets].sort((a, b) => b.set_number - a.set_number)[0] ?? null
+        ? (selectedSetId != null
+            ? session.sets.find((s) => s.id === selectedSetId) ?? null
+            : [...session.sets].sort((a, b) => b.set_number - a.set_number)[0] ?? null)
         : null;
 
     // Handle toggle recording (start / stop)
@@ -140,6 +147,17 @@ export default function SessionDetailPage() {
             setError(err instanceof Error ? err.message : 'Failed to create new set');
         } finally {
             setActionLoading(null);
+        }
+    }
+
+    // Handle update set (name, description, weight)
+    async function handleUpdateSet(setId: number, data: UpdateSetData) {
+        try {
+            setError(null);
+            await updateSet(setId, data);
+            await loadSession();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to update set');
         }
     }
 
@@ -236,8 +254,8 @@ export default function SessionDetailPage() {
         try {
             setAnalysisLoading((prev) => ({ ...prev, [dataId]: true }));
             setError(null);
-            const romThreshold = minRomCm[dataId] ?? 3.0;
-            const restSens = restSensitivity[dataId] ?? 0.5;
+            const romThreshold = minRomCm[dataId] ?? 15.0;
+            const restSens = restSensitivity[dataId] ?? 1.0;
             const weight = weightKg[dataId] ?? 0;
             const result = await analyzeAccelerometerData(dataId, { min_rom_cm: romThreshold, rest_sensitivity: restSens, weight_kg: weight });
             setAnalyses((prev) => ({ ...prev, [dataId]: result }));
@@ -254,8 +272,8 @@ export default function SessionDetailPage() {
         try {
             setAnalysisLoading((prev) => ({ ...prev, [dataId]: true }));
             setError(null);
-            const romThreshold = minRomCm[dataId] ?? 3.0;
-            const restSens = restSensitivity[dataId] ?? 0.5;
+            const romThreshold = minRomCm[dataId] ?? 15.0;
+            const restSens = restSensitivity[dataId] ?? 1.0;
             const weight = weightKg[dataId] ?? 0;
             const result = await analyzeAccelerometerData(dataId, { min_rom_cm: romThreshold, rest_sensitivity: restSens, weight_kg: weight });
             setAnalyses((prev) => ({ ...prev, [dataId]: result }));
@@ -382,12 +400,14 @@ export default function SessionDetailPage() {
                         onCreateNewSet={handleCreateNewSet}
                         onAnalyze={handleAnalyze}
                         onLiveData={handleLiveData}
+                        onUpdateSet={handleUpdateSet}
                     />
 
                     <SetDetailsCard
                         sets={session.sets || []}
                         serialStatus={serialStatus}
                         recordingSetId={recordingSetId}
+                        activeSetId={lastSet?.id ?? null}
                         actionLoading={actionLoading}
                         analyses={analyses}
                         analysisOpen={analysisOpen}
@@ -396,6 +416,7 @@ export default function SessionDetailPage() {
                         restSensitivity={restSensitivity}
                         weightKg={weightKg}
                         onRecordToSet={handleRecordToSet}
+                        onSelectSet={setSelectedSetId}
                         onAnalyze={handleAnalyze}
                         onReanalyze={handleReanalyze}
                         onDeleteSet={handleDeleteSet}

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
     Title,
     Text,
@@ -8,6 +9,9 @@ import {
     Badge,
     ActionIcon,
     Divider,
+    TextInput,
+    Textarea,
+    NumberInput,
 } from '@mantine/core';
 import {
     IconActivity,
@@ -16,8 +20,12 @@ import {
     IconPlus,
     IconChartLine,
     IconDownload,
+    IconEdit,
+    IconCheck,
+    IconX,
 } from '@tabler/icons-react';
 import type { WorkoutSet } from '../../services/sessions';
+import type { UpdateSetData } from '../../services/sessions';
 import type { SerialStatus } from '../../services/livedata';
 import type { AccelDataPoint } from '../../services/livedata';
 import LiveAccelChart from './LiveAccelChart';
@@ -33,6 +41,7 @@ interface ActiveSetCardProps {
     onCreateNewSet: () => void;
     onAnalyze: (dataId: number) => void;
     onLiveData: (point: AccelDataPoint) => void;
+    onUpdateSet?: (setId: number, data: UpdateSetData) => Promise<void>;
 }
 
 export default function ActiveSetCard({
@@ -45,7 +54,40 @@ export default function ActiveSetCard({
     onCreateNewSet,
     onAnalyze,
     onLiveData,
+    onUpdateSet,
 }: ActiveSetCardProps) {
+    const [editing, setEditing] = useState(false);
+    const [editName, setEditName] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+    const [editWeight, setEditWeight] = useState<number | string>('');
+    const [saving, setSaving] = useState(false);
+
+    function startEditing() {
+        if (!lastSet) return;
+        setEditName(lastSet.name ?? '');
+        setEditDescription(lastSet.description ?? '');
+        setEditWeight(lastSet.weight_kg ?? '');
+        setEditing(true);
+    }
+
+    function cancelEditing() {
+        setEditing(false);
+    }
+
+    async function saveEdit() {
+        if (!lastSet || !onUpdateSet) return;
+        try {
+            setSaving(true);
+            await onUpdateSet(lastSet.id, {
+                name: editName.trim() || null,
+                description: editDescription.trim() || null,
+                weight_kg: editWeight === '' ? null : Number(editWeight),
+            });
+            setEditing(false);
+        } finally {
+            setSaving(false);
+        }
+    }
     return (
         <Card shadow="sm" padding="lg" withBorder>
             <Stack gap="md">
@@ -107,45 +149,86 @@ export default function ActiveSetCard({
                         </Group>
                     </Stack>
                 ) : lastSet ? (
-                    <Group justify="space-between" align="center">
-                        <Stack gap={4}>
-                            <Text fw={500}>Set {lastSet.set_number}</Text>
-                            <Text size="sm" c="dimmed">
-                                {lastSet.accelerometer_data
-                                    ? `${formatFileSize(lastSet.accelerometer_data.file_size)} · `
-                                    : 'Empty · '}
-                                {formatDate(lastSet.created_at)}
-                            </Text>
-                            {lastSet.accelerometer_data?.description && (
-                                <Text size="sm">{lastSet.accelerometer_data.description}</Text>
-                            )}
+                    editing ? (
+                        <Stack gap="sm">
+                            <TextInput
+                                label="Name"
+                                placeholder="e.g. Warm-up set"
+                                value={editName}
+                                onChange={(e) => setEditName(e.currentTarget.value)}
+                            />
+                            <Textarea
+                                label="Description"
+                                placeholder="Notes about this set"
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.currentTarget.value)}
+                                autosize
+                                minRows={2}
+                                maxRows={4}
+                            />
+                            <NumberInput
+                                label="Weight (kg)"
+                                placeholder="0"
+                                value={editWeight}
+                                onChange={setEditWeight}
+                                min={0}
+                                decimalScale={2}
+                            />
+                            <Group justify="flex-end" gap="xs">
+                                <Button
+                                    variant="subtle"
+                                    size="compact-sm"
+                                    leftSection={<IconX size={14} />}
+                                    onClick={cancelEditing}
+                                    disabled={saving}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    size="compact-sm"
+                                    leftSection={<IconCheck size={14} />}
+                                    onClick={saveEdit}
+                                    loading={saving}
+                                >
+                                    Save
+                                </Button>
+                            </Group>
                         </Stack>
-                        <Group gap="xs">
-                            {lastSet.accelerometer_data && (
-                                <>
+                    ) : (
+                        <Group justify="space-between" align="center">
+                            <Stack gap={4}>
+                                <Text fw={500}>
+                                    {lastSet.name || `Set ${lastSet.set_number}`}
+                                </Text>
+                                {lastSet.weight_kg != null && (
+                                    <Text size="sm" c="blue">
+                                        {lastSet.weight_kg} kg
+                                    </Text>
+                                )}
+                                <Text size="sm" c="dimmed">
+                                    {lastSet.accelerometer_data
+                                        ? `${formatFileSize(lastSet.accelerometer_data.file_size)} · `
+                                        : 'Empty · '}
+                                    {formatDate(lastSet.created_at)}
+                                </Text>
+                                {lastSet.description && (
+                                    <Text size="sm">{lastSet.description}</Text>
+                                )}
+                            </Stack>
+                            <Group gap="xs">
+                                {onUpdateSet && (
                                     <ActionIcon
                                         variant="subtle"
-                                        color="grape"
-                                        onClick={() => onAnalyze(lastSet.accelerometer_data!.id)}
-                                        loading={analysisLoading[lastSet.accelerometer_data.id] ?? false}
-                                        title="Analyze"
+                                        color="gray"
+                                        onClick={startEditing}
+                                        title="Edit set"
                                     >
-                                        <IconChartLine size={16} />
+                                        <IconEdit size={16} />
                                     </ActionIcon>
-                                    <ActionIcon
-                                        component="a"
-                                        href={getDownloadUrl(lastSet.accelerometer_data.file_path)}
-                                        target="_blank"
-                                        variant="subtle"
-                                        color="blue"
-                                        title="Download"
-                                    >
-                                        <IconDownload size={16} />
-                                    </ActionIcon>
-                                </>
-                            )}
+                                )}
+                            </Group>
                         </Group>
-                    </Group>
+                    )
                 ) : (
                     <Text c="dimmed" ta="center" py="md">
                         No sets recorded yet.

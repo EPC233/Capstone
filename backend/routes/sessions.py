@@ -18,13 +18,14 @@ from models.session import Session
 from models.set import Set
 from models.accelerometer_data import AccelerometerData
 from models.graph_image import GraphImage
+from models.rep_detail import RepDetail
 from schemas.session import (
     SessionCreate,
     SessionResponse,
     SessionUpdate,
     GraphImageResponse,
 )
-from schemas.set import SetCreate, SetResponse
+from schemas.set import SetCreate, SetUpdate, SetResponse
 from services.analysis_service import analyze_csv
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -38,6 +39,7 @@ def _session_query_options():
     """Common joinedload options for session queries."""
     return [
         joinedload(Session.sets).joinedload(Set.accelerometer_data),
+        joinedload(Session.sets).joinedload(Set.rep_details),
         joinedload(Session.graph_images),
     ]
 
@@ -187,6 +189,8 @@ async def create_set(
     new_set = Set(
         session_id=session_id,
         set_number=existing_count + 1,
+        name=set_data.name if set_data else None,
+        description=set_data.description if set_data else None,
         weight_kg=set_data.weight_kg if set_data else None,
         status="empty",
     )
@@ -196,7 +200,47 @@ async def create_set(
     result = await db.execute(
         select(Set)
         .where(Set.id == new_set.id)
+        .options(
+            joinedload(Set.accelerometer_data),
+            joinedload(Set.rep_details),
+        )
+    )
+    return result.scalars().unique().one()
+
+
+@router.patch("/sets/{set_id}", response_model=SetResponse)
+async def update_set(
+    set_id: int,
+    update_data: SetUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Update a set's name, description, weight, or status."""
+    result = await db.execute(
+        select(Set)
+        .join(Session)
+        .where(Set.id == set_id, Session.user_id == current_user.id)
         .options(joinedload(Set.accelerometer_data))
+    )
+    s = result.scalars().first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Set not found")
+
+    update_fields = update_data.model_dump(exclude_unset=True)
+    for field, value in update_fields.items():
+        setattr(s, field, value)
+
+    await db.commit()
+    await db.refresh(s)
+
+    # Re-query with joined load to get full response
+    result = await db.execute(
+        select(Set)
+        .where(Set.id == set_id)
+        .options(
+            joinedload(Set.accelerometer_data),
+            joinedload(Set.rep_details),
+        )
     )
     return result.scalars().unique().one()
 
@@ -284,7 +328,10 @@ async def upload_accelerometer_data(
     result = await db.execute(
         select(Set)
         .where(Set.id == set_id)
-        .options(joinedload(Set.accelerometer_data))
+        .options(
+            joinedload(Set.accelerometer_data),
+            joinedload(Set.rep_details),
+        )
     )
     return result.scalars().unique().one()
 
@@ -297,7 +344,7 @@ async def analyze_accelerometer_data(
     smooth_window: int = 11,
     min_rep_samples: int = 20,
     min_rom_cm: float = 3.0,
-    rest_sensitivity: float = 0.5,
+    rest_sensitivity: float = 1.0,
     weight_kg: float = 0.0,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -347,6 +394,58 @@ async def analyze_accelerometer_data(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
+
+    # ── Persist rep details to the database ──
+    set_id = data.set_id
+
+    # Delete existing rep details for this set
+    await db.execute(
+        select(RepDetail).where(RepDetail.set_id == set_id)
+    )
+    existing = (await db.execute(
+        select(RepDetail).where(RepDetail.set_id == set_id)
+    )).scalars().all()
+    for rd in existing:
+        await db.delete(rd)
+
+    # Insert new rep details
+    for rep in analysis.get("reps", []):
+        ecc = rep.get("eccentric")
+        con = rep.get("concentric")
+        new_rd = RepDetail(
+            set_id=set_id,
+            rep_number=rep["rep_number"],
+            start_sample=rep["start_sample"],
+            end_sample=rep["end_sample"],
+            duration_seconds=rep["duration_seconds"],
+            rom_meters=rep["rom_meters"],
+            rom_cm=rep["rom_cm"],
+            peak_velocity=rep["peak_velocity"],
+            avg_velocity=rep["avg_velocity"],
+            peak_accel=rep["peak_accel"],
+            avg_watts=rep.get("avg_watts"),
+            rest_at_top_seconds=rep.get("rest_at_top_seconds"),
+            rest_at_bottom_seconds=rep.get("rest_at_bottom_seconds"),
+            ecc_start_sample=ecc["start_sample"] if ecc else None,
+            ecc_end_sample=ecc["end_sample"] if ecc else None,
+            ecc_duration_seconds=ecc["duration_seconds"] if ecc else None,
+            ecc_peak_velocity=ecc["peak_velocity"] if ecc else None,
+            ecc_avg_velocity=ecc["avg_velocity"] if ecc else None,
+            ecc_peak_accel=ecc["peak_accel"] if ecc else None,
+            ecc_avg_accel=ecc["avg_accel"] if ecc else None,
+            ecc_avg_watts=ecc.get("avg_watts") if ecc else None,
+            con_start_sample=con["start_sample"] if con else None,
+            con_end_sample=con["end_sample"] if con else None,
+            con_duration_seconds=con["duration_seconds"] if con else None,
+            con_peak_velocity=con["peak_velocity"] if con else None,
+            con_avg_velocity=con["avg_velocity"] if con else None,
+            con_peak_accel=con["peak_accel"] if con else None,
+            con_avg_accel=con["avg_accel"] if con else None,
+            con_avg_watts=con.get("avg_watts") if con else None,
+        )
+        db.add(new_rd)
+
+    await db.commit()
 
     return analysis
 

@@ -21,12 +21,13 @@ import {
 import type { WorkoutSet, AnalysisResult } from '../../services/sessions';
 import type { SerialStatus } from '../../services/livedata';
 import SetAnalysisPanel from './SetAnalysisPanel';
-import { formatDate, formatFileSize, getDownloadUrl } from './sessionUtils';
+import { formatDate, getDownloadUrl } from './sessionUtils';
 
 interface SetDetailsCardProps {
     sets: WorkoutSet[];
     serialStatus: SerialStatus;
     recordingSetId: number | null;
+    activeSetId: number | null;
     actionLoading: string | null;
     analyses: Record<number, AnalysisResult>;
     analysisOpen: Record<number, boolean>;
@@ -35,6 +36,7 @@ interface SetDetailsCardProps {
     restSensitivity: Record<number, number>;
     weightKg: Record<number, number>;
     onRecordToSet: (setId: number) => void;
+    onSelectSet: (setId: number) => void;
     onAnalyze: (dataId: number) => void;
     onReanalyze: (dataId: number) => void;
     onDeleteSet: (setId: number) => void;
@@ -47,6 +49,7 @@ export default function SetDetailsCard({
     sets,
     serialStatus,
     recordingSetId,
+    activeSetId,
     actionLoading,
     analyses,
     analysisOpen,
@@ -55,6 +58,7 @@ export default function SetDetailsCard({
     restSensitivity,
     weightKg,
     onRecordToSet,
+    onSelectSet,
     onAnalyze,
     onReanalyze,
     onDeleteSet,
@@ -79,7 +83,7 @@ export default function SetDetailsCard({
                             <Table.Tr>
                                 <Table.Th>Set</Table.Th>
                                 <Table.Th>Status</Table.Th>
-                                <Table.Th>Size</Table.Th>
+                                <Table.Th>Weight</Table.Th>
                                 <Table.Th>Description</Table.Th>
                                 <Table.Th>Created</Table.Th>
                                 <Table.Th>Actions</Table.Th>
@@ -93,9 +97,23 @@ export default function SetDetailsCard({
                                     const dataId = accel?.id;
                                     return (
                                         <React.Fragment key={s.id}>
-                                            <Table.Tr>
+                                            <Table.Tr
+                                                onClick={() => onSelectSet(s.id)}
+                                                onDoubleClick={() => {
+                                                    if (dataId) onAnalyze(dataId);
+                                                }}
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    background:
+                                                        activeSetId === s.id
+                                                            ? 'var(--mantine-color-blue-light)'
+                                                            : undefined,
+                                                }}
+                                            >
                                                 <Table.Td>
-                                                    <Text fw={500}>Set {s.set_number}</Text>
+                                                    <Text fw={500}>
+                                                        {s.name || `Set ${s.set_number}`}
+                                                    </Text>
                                                 </Table.Td>
                                                 <Table.Td>
                                                     <Badge
@@ -113,12 +131,12 @@ export default function SetDetailsCard({
                                                     </Badge>
                                                 </Table.Td>
                                                 <Table.Td>
-                                                    {accel ? formatFileSize(accel.file_size) : '-'}
+                                                    {s.weight_kg != null ? `${s.weight_kg} kg` : '-'}
                                                 </Table.Td>
-                                                <Table.Td>{accel?.description || '-'}</Table.Td>
+                                                <Table.Td>{s.description || '-'}</Table.Td>
                                                 <Table.Td>{formatDate(s.created_at)}</Table.Td>
                                                 <Table.Td>
-                                                    <Group gap="xs">
+                                                    <Group gap="xs" onClick={(e) => e.stopPropagation()}>
                                                         <ActionIcon
                                                             color={
                                                                 serialStatus.recording &&
@@ -198,15 +216,15 @@ export default function SetDetailsCard({
                                             {/* Inline analysis chart */}
                                             {dataId && analyses[dataId] && (
                                                 <Table.Tr key={`analysis-${dataId}`}>
-                                                    <Table.Td colSpan={6} p={0}>
+                                                    <Table.Td colSpan={7} p={0}>
                                                         <SetAnalysisPanel
                                                             dataId={dataId}
                                                             analysis={analyses[dataId]!}
                                                             isOpen={analysisOpen[dataId] ?? false}
                                                             isLoading={analysisLoading[dataId] ?? false}
-                                                            minRomCm={minRomCm[dataId] ?? 3.0}
+                                                            minRomCm={minRomCm[dataId] ?? 15.0}
                                                             restSensitivity={
-                                                                restSensitivity[dataId] ?? 0.5
+                                                                restSensitivity[dataId] ?? 1.0
                                                             }
                                                             weightKg={weightKg[dataId] ?? 0}
                                                             onMinRomCmChange={onMinRomCmChange}

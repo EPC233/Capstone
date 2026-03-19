@@ -18,6 +18,7 @@ from models import (  # noqa: F401
     Base,
     Friendship,
     GraphImage,
+    RepDetail,
     Set,
     User,
     Session,

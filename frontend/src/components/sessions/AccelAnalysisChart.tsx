@@ -258,11 +258,15 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                             </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
-                            {reps.map((rep) => (
+                            {reps.map((rep) => {
+                                const hasRestTop = rep.rest_at_top_seconds != null && rep.rest_at_top_seconds > 0;
+                                const hasRestBottom = rep.rest_at_bottom_seconds != null && rep.rest_at_bottom_seconds > 0;
+                                const rowSpan = 2 + (hasRestTop ? 1 : 0) + (hasRestBottom ? 1 : 0);
+                                return (
                                 <React.Fragment key={rep.rep_number}>
                                     {/* Eccentric row (upward) */}
                                     <Table.Tr>
-                                        <Table.Td rowSpan={2} style={{ verticalAlign: 'middle', fontWeight: 600 }}>
+                                        <Table.Td rowSpan={rowSpan} style={{ verticalAlign: 'middle', fontWeight: 600 }}>
                                             #{rep.rep_number}
                                         </Table.Td>
                                         <Table.Td style={{ minWidth: 130, overflow: 'visible' }}>
@@ -293,6 +297,20 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                                             {rep.eccentric ? `${rep.eccentric.start_sample}–${rep.eccentric.end_sample}` : '—'}
                                         </Table.Td>
                                     </Table.Tr>
+                                    {/* Rest-at-top row (pause between phases) */}
+                                    {hasRestTop && (
+                                    <Table.Tr>
+                                        <Table.Td style={{ minWidth: 130, overflow: 'visible' }}>
+                                            <Badge size="sm" color="gray" variant="light">Rest ⏸</Badge>
+                                        </Table.Td>
+                                        <Table.Td>
+                                            {rep.rest_at_top_seconds}s
+                                        </Table.Td>
+                                        <Table.Td colSpan={7} style={{ color: '#888', fontStyle: 'italic' }}>
+                                            Pause at top of rep
+                                        </Table.Td>
+                                    </Table.Tr>
+                                    )}
                                     {/* Concentric row (downward) */}
                                     <Table.Tr>
                                         <Table.Td style={{ minWidth: 130, overflow: 'visible' }}>
@@ -319,8 +337,23 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                                             {rep.concentric ? `${rep.concentric.start_sample}–${rep.concentric.end_sample}` : '—'}
                                         </Table.Td>
                                     </Table.Tr>
+                                    {/* Rest-at-bottom row (pause at bottom of rep) */}
+                                    {hasRestBottom && (
+                                    <Table.Tr>
+                                        <Table.Td style={{ minWidth: 130, overflow: 'visible' }}>
+                                            <Badge size="sm" color="gray" variant="light">Rest ⏸</Badge>
+                                        </Table.Td>
+                                        <Table.Td>
+                                            {rep.rest_at_bottom_seconds}s
+                                        </Table.Td>
+                                        <Table.Td colSpan={7} style={{ color: '#888', fontStyle: 'italic' }}>
+                                            Pause at bottom of rep
+                                        </Table.Td>
+                                    </Table.Tr>
+                                    )}
                                 </React.Fragment>
-                            ))}
+                                );
+                            })}
                         </Table.Tbody>
                     </Table>
                     </Box>

@@ -16,9 +16,12 @@ export interface WorkoutSet {
     id: number;
     session_id: number;
     set_number: number;
+    name?: string | null;
+    description?: string | null;
     weight_kg?: number | null;
     status: string; // "empty" | "recording" | "complete"
     accelerometer_data: AccelerometerData | null;
+    rep_details: RepInfo[];
     created_at: string;
     updated_at: string;
 }
@@ -59,6 +62,12 @@ export interface UpdateSessionData {
 }
 
 export interface CreateSetData {
+    weight_kg?: number | null;
+}
+
+export interface UpdateSetData {
+    name?: string | null;
+    description?: string | null;
     weight_kg?: number | null;
 }
 
@@ -156,6 +165,18 @@ export async function deleteSet(setId: number): Promise<void> {
     await handleResponse<void>(response);
 }
 
+export async function updateSet(
+    setId: number,
+    data: UpdateSetData,
+): Promise<WorkoutSet> {
+    const response = await fetch(`${getApiUrl()}/sessions/sets/${setId}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+    });
+    return handleResponse<WorkoutSet>(response);
+}
+
 // ---- Accelerometer data (attached to a Set) --------------------------------
 
 export async function uploadAccelerometerData(
@@ -240,6 +261,8 @@ export interface RepInfo {
     concentric: PhaseInfo | null;
     eccentric: PhaseInfo | null;
     avg_watts: number | null;
+    rest_at_top_seconds: number | null;
+    rest_at_bottom_seconds: number | null;
 }
 
 export interface AnalysisChart {

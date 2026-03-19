@@ -608,7 +608,6 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
                     if weight_kg > 0 and duration > 0 else None
                 ),
                 rest_at_top_seconds=rest_at_top_secs if rest_at_top_secs > 0 else None,
-                rest_at_bottom_seconds=rest_at_bottom_secs if rest_at_bottom_secs > 0 else None,
             )
         )
 
@@ -641,7 +640,6 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
                 "peak_accel": r.peak_accel,
                 "avg_watts": r.avg_watts,
                 "rest_at_top_seconds": r.rest_at_top_seconds,
-                "rest_at_bottom_seconds": r.rest_at_bottom_seconds,
                 "concentric": {
                     "start_sample": r.concentric.start_sample,
                     "end_sample": r.concentric.end_sample,

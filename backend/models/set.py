@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
@@ -25,6 +26,8 @@ class Set(Base):
         Integer, ForeignKey("sessions.id"), nullable=False, index=True
     )
     set_number = Column(Integer, nullable=False)
+    name = Column(String(255), nullable=True)
+    description = Column(Text, nullable=True)
     weight_kg = Column(Float, nullable=True)
     status = Column(
         String(20), nullable=False, default="empty"
@@ -41,4 +44,10 @@ class Set(Base):
         back_populates="set",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+    rep_details = relationship(
+        "RepDetail",
+        back_populates="set",
+        cascade="all, delete-orphan",
+        order_by="RepDetail.rep_number",
     )

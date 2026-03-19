@@ -17,7 +17,6 @@ export const SESSION_TYPE_OPTIONS = [
 /** Format a date string into a human-readable locale string */
 export function formatDate(dateString: string): string {
     return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
