@@ -9,20 +9,22 @@ import {
     Button,
     ThemeIcon,
 } from '@mantine/core';
-import { IconUsb, IconPlugConnected, IconPlugConnectedX } from '@tabler/icons-react';
+import { IconUsb, IconBluetooth, IconPlugConnected, IconPlugConnectedX } from '@tabler/icons-react';
 import { useSerialStatus } from '../../contexts/SerialStatusContext';
 import { connectSerial, disconnectSerial } from '../../services/livedata';
+import { connectBle, disconnectBle } from '../../services/bluetooth';
 
 export default function SerialStatusCard() {
-    const { status, refreshStatus } = useSerialStatus();
+    const { status, bleConnected, refreshStatus } = useSerialStatus();
     const [loading, setLoading] = useState(false);
+    const [bleLoading, setBleLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    async function handleToggle() {
+    async function handleToggleUsb() {
         try {
             setLoading(true);
             setError(null);
-            if (status.connected) {
+            if (status.connected && !bleConnected) {
                 await disconnectSerial();
             } else {
                 await connectSerial();
@@ -35,6 +37,26 @@ export default function SerialStatusCard() {
         }
     }
 
+    async function handleToggleBle() {
+        try {
+            setBleLoading(true);
+            setError(null);
+            if (bleConnected) {
+                await disconnectBle();
+            } else {
+                await connectBle();
+            }
+            await refreshStatus();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Bluetooth connection failed');
+        } finally {
+            setBleLoading(false);
+        }
+    }
+
+    const connectedViaBle = status.connected && bleConnected;
+    const connectedViaUsb = status.connected && !bleConnected;
+
     return (
         <Card shadow="sm" padding="lg" withBorder>
             <Stack gap="md">
@@ -45,7 +67,7 @@ export default function SerialStatusCard() {
                         variant="light"
                         size="lg"
                     >
-                        {status.connected ? 'Connected' : 'Disconnected'}
+                        {connectedViaBle ? 'Bluetooth' : connectedViaUsb ? 'USB' : 'Disconnected'}
                     </Badge>
                 </Group>
                 <Group gap="sm">
@@ -54,12 +76,12 @@ export default function SerialStatusCard() {
                         variant="light"
                         color={status.connected ? 'green' : 'gray'}
                     >
-                        <IconUsb size={20} />
+                        {connectedViaBle ? <IconBluetooth size={20} /> : <IconUsb size={20} />}
                     </ThemeIcon>
                     <div>
                         <Text size="sm" fw={500}>
                             {status.connected
-                                ? `Port: ${status.port ?? 'unknown'}`
+                                ? `${connectedViaBle ? 'BLE' : 'Port'}: ${status.port ?? 'unknown'}`
                                 : 'No sensor detected'}
                         </Text>
                         {status.recording && (
@@ -72,20 +94,32 @@ export default function SerialStatusCard() {
                 {error && (
                     <Text size="xs" c="red">{error}</Text>
                 )}
-                <Button
-                    variant={status.connected ? 'light' : 'filled'}
-                    color={status.connected ? 'red' : 'green'}
-                    leftSection={
-                        status.connected
-                            ? <IconPlugConnectedX size={16} />
-                            : <IconPlugConnected size={16} />
-                    }
-                    onClick={handleToggle}
-                    loading={loading}
-                    disabled={status.recording}
-                >
-                    {status.connected ? 'Disconnect' : 'Connect Sensor'}
-                </Button>
+                <Group grow>
+                    <Button
+                        variant={connectedViaUsb ? 'light' : 'filled'}
+                        color={connectedViaUsb ? 'red' : 'green'}
+                        leftSection={
+                            connectedViaUsb
+                                ? <IconPlugConnectedX size={16} />
+                                : <IconPlugConnected size={16} />
+                        }
+                        onClick={handleToggleUsb}
+                        loading={loading}
+                        disabled={status.recording || bleConnected}
+                    >
+                        {connectedViaUsb ? 'Disconnect' : 'USB'}
+                    </Button>
+                    <Button
+                        variant={connectedViaBle ? 'light' : 'filled'}
+                        color={connectedViaBle ? 'red' : 'blue'}
+                        leftSection={<IconBluetooth size={16} />}
+                        onClick={handleToggleBle}
+                        loading={bleLoading}
+                        disabled={status.recording || connectedViaUsb}
+                    >
+                        {connectedViaBle ? 'Disconnect' : 'Bluetooth'}
+                    </Button>
+                </Group>
             </Stack>
         </Card>
     );

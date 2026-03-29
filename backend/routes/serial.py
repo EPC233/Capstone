@@ -14,7 +14,7 @@ Provides:
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import joinedload
@@ -192,6 +192,113 @@ async def stop_recording(
             result["accelerometer_data_id"] = accel_data.id
 
     return result
+
+
+# ------------------------------------------------------------------
+# BLE CSV upload endpoint (client-side recording)
+# ------------------------------------------------------------------
+
+@router.post("/record/upload")
+async def upload_recording(
+    request: Request,
+    session_id: int = Query(..., description="Session ID to save recording to"),
+    set_id: int = Query(None, description="Existing set ID to overwrite"),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Accept a CSV body recorded client-side (e.g. via BLE) and save it to a session.
+    Reuses the same save logic as /record/stop.
+    """
+    csv_content = (await request.body()).decode("utf-8")
+    if not csv_content.strip():
+        return {"error": "Empty CSV body"}
+
+    lines = [l for l in csv_content.strip().split("\n") if l.strip()]
+    sample_count = max(len(lines) - 1, 0)  # exclude header
+
+    # Verify session ownership
+    stmt = select(Session).where(
+        Session.id == session_id, Session.user_id == current_user.id
+    )
+    session_result = await db.execute(stmt)
+    session = session_result.scalars().first()
+
+    if session is None:
+        return {"error": "Session not found or not owned by user"}
+
+    # Find or create target set
+    if set_id is not None:
+        set_stmt = select(Set).where(
+            Set.id == set_id, Set.session_id == session_id
+        )
+        set_result = await db.execute(set_stmt)
+        target_set = set_result.scalars().first()
+        if target_set is None:
+            return {"error": "Set not found or does not belong to this session"}
+        new_set = target_set
+    else:
+        count_stmt = select(Set).where(Set.session_id == session_id)
+        count_result = await db.execute(count_stmt)
+        existing_sets = count_result.scalars().all()
+
+        last_empty = None
+        for s in sorted(existing_sets, key=lambda x: x.set_number, reverse=True):
+            if s.status == "empty":
+                last_empty = s
+                break
+
+        if last_empty:
+            new_set = last_empty
+        else:
+            new_set = Set(
+                session_id=session_id,
+                set_number=len(existing_sets) + 1,
+                status="recording",
+            )
+            db.add(new_set)
+            await db.flush()
+
+    timestamp = datetime.utcnow().timestamp()
+    file_name = f"recording_{session_id}_{timestamp:.0f}.csv"
+    file_path = os.path.join(UPLOAD_DIR, file_name)
+
+    with open(file_path, "w") as f:
+        f.write(csv_content)
+
+    # Remove existing accel data on the set if present
+    if new_set.id:
+        old_accel = await db.execute(
+            select(AccelerometerData).where(
+                AccelerometerData.set_id == new_set.id
+            )
+        )
+        old = old_accel.scalars().first()
+        if old:
+            if os.path.exists(old.file_path):
+                os.remove(old.file_path)
+            await db.delete(old)
+            await db.flush()
+
+    accel_data = AccelerometerData(
+        set_id=new_set.id,
+        file_name=file_name,
+        file_path=file_path,
+        file_size=len(csv_content.encode()),
+        description=f"Set {new_set.set_number} — {sample_count} samples (BLE)",
+    )
+    db.add(accel_data)
+    new_set.status = "complete"
+    new_set.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(accel_data)
+
+    return {
+        "saved_to_session": session_id,
+        "set_id": new_set.id,
+        "accelerometer_data_id": accel_data.id,
+        "sample_count": sample_count,
+    }
 
 
 # ------------------------------------------------------------------

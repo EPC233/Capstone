@@ -4,6 +4,7 @@ import {
     createLiveDataSocket,
     type AccelDataPoint,
 } from '../../services/livedata';
+import { isBleConnected, onBleData } from '../../services/bluetooth';
 
 const MAX_CHART_POINTS = 300;
 
@@ -37,32 +38,43 @@ export default function LiveAccelChart({
         onDataRef.current = onData;
     }, [onData]);
 
-    // ---- WebSocket lifecycle ----
+    // ---- Data source lifecycle (BLE or WebSocket) ----
     useEffect(() => {
-        if (active) {
-            if (!socketRef.current) {
-                const sock = createLiveDataSocket();
-                socketRef.current = sock;
-                sock.onData((point: AccelDataPoint) => {
-                    chartBuffer.current.push(point);
-                    if (chartBuffer.current.length > MAX_CHART_POINTS) {
-                        chartBuffer.current = chartBuffer.current.slice(-MAX_CHART_POINTS);
-                    }
-                    onDataRef.current?.(point);
-                });
-                sock.onClose(() => {
-                    socketRef.current = null;
-                });
-                sock.onError(() => {
-                    socketRef.current = null;
-                });
-            }
-        } else {
+        if (!active) {
             if (socketRef.current) {
                 socketRef.current.close();
                 socketRef.current = null;
             }
+            return;
         }
+
+        const pushPoint = (point: AccelDataPoint) => {
+            chartBuffer.current.push(point);
+            if (chartBuffer.current.length > MAX_CHART_POINTS) {
+                chartBuffer.current = chartBuffer.current.slice(-MAX_CHART_POINTS);
+            }
+            onDataRef.current?.(point);
+        };
+
+        // If BLE is connected, subscribe to BLE data instead of WebSocket
+        if (isBleConnected()) {
+            const unsub = onBleData(pushPoint);
+            return () => { unsub(); };
+        }
+
+        // Otherwise use WebSocket
+        if (!socketRef.current) {
+            const sock = createLiveDataSocket();
+            socketRef.current = sock;
+            sock.onData(pushPoint);
+            sock.onClose(() => {
+                socketRef.current = null;
+            });
+            sock.onError(() => {
+                socketRef.current = null;
+            });
+        }
+
         return () => {
             if (socketRef.current) {
                 socketRef.current.close();

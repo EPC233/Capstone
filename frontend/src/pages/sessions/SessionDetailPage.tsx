@@ -32,6 +32,11 @@ import {
     stopRecording,
     type AccelDataPoint,
 } from '../../services/livedata';
+import {
+    isBleConnected,
+    startBleRecording,
+    stopBleRecording,
+} from '../../services/bluetooth';
 import SessionHeader from '../../components/sessions/SessionHeader';
 import SessionInfoCard from '../../components/sessions/SessionInfoCard';
 import ActiveSetCard, { type SetComparison } from '../../components/sessions/ActiveSetCard';
@@ -140,13 +145,20 @@ export default function SessionDetailPage() {
 
             if (serialStatus.recording) {
                 // ── Stop recording ──
-                // The backend will reuse the last empty set or create a new one
-                await stopRecording(session.id, recordingSetId ?? undefined);
+                if (isBleConnected()) {
+                    await stopBleRecording(session.id, recordingSetId ?? undefined);
+                } else {
+                    await stopRecording(session.id, recordingSetId ?? undefined);
+                }
                 setRecordingSetId(null);
                 await loadSession();
             } else {
                 // ── Start recording ──
-                await startRecording();
+                if (isBleConnected()) {
+                    startBleRecording();
+                } else {
+                    await startRecording();
+                }
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Recording failed');
@@ -164,13 +176,21 @@ export default function SessionDetailPage() {
 
             if (serialStatus.recording) {
                 // Already recording – stop and save to the tracked set
-                await stopRecording(session.id, recordingSetId ?? undefined);
+                if (isBleConnected()) {
+                    await stopBleRecording(session.id, recordingSetId ?? undefined);
+                } else {
+                    await stopRecording(session.id, recordingSetId ?? undefined);
+                }
                 setRecordingSetId(null);
                 await loadSession();
             } else {
                 // Start recording, remembering which set to target on stop
                 setRecordingSetId(setId);
-                await startRecording();
+                if (isBleConnected()) {
+                    startBleRecording();
+                } else {
+                    await startRecording();
+                }
             }
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Recording failed');
