@@ -90,7 +90,7 @@ def _downsample(arr: np.ndarray, max_points: int = 1500) -> tuple[list[int], lis
 def analyze_csv(csv_content: str | bytes, sample_rate: int = 100, 
                 threshold: float = 0.05, smooth_window: int = 11,
                 min_rep_samples: int = 20, min_rom_cm: float = 3.0,
-                rest_sensitivity: float = 1.0,
+                rest_sensitivity: float = 1.2,
                 weight_kg: float = 0.0,
                 recording_duration_seconds: float | None = None) -> dict:
     """
@@ -117,7 +117,7 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
         rest_sensitivity are zeroed, preventing noise during pauses
         from drifting velocity / position.  Also used for inter-rep
         boundary trimming and intra-rep rest detection.
-        Range 0.1–5.0 (default 1.0).
+        Range 0–2.0 (default 1.2).
     weight_kg : float
         Weight being lifted in kilograms.  When > 0, average power
         (watts) is computed for each rep as W·g·ROM / duration.
@@ -309,37 +309,18 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
         valley_bounds.append(valley)
     valley_bounds.append(active_end)
 
-    # 4. Build candidate reps (one per valley-to-valley segment)
-    #    Trim each segment inward to where actual motion begins/ends,
-    #    leaving dead zones (pauses) between reps un-integrated.
-    #    Use |accel| directly (no rolling window lag) so even short
-    #    pauses are detected.
-    abs_accel = np.abs(accel)
-    trim_threshold = threshold * rest_sensitivity
-
+    # 4. Build candidate reps directly from valley-to-valley segments.
+    #    No inter-rep trimming — the dead-zone filter on accel_int and
+    #    the velocity zeroing pass prevent drift during pauses.  Using
+    #    untrimmed boundaries ensures reps are contiguous (no unshaded
+    #    gaps) and that bottom-rest pauses are fully captured.
     candidate_reps = []
     for j in range(len(valley_bounds) - 1):
         rs = valley_bounds[j]
         re = valley_bounds[j + 1]
         if re - rs < min_rep_samples:
             continue
-
-        # Walk inward from the left until |accel| exceeds the trim threshold
-        trimmed_start = rs
-        for k in range(rs, re + 1):
-            if abs_accel[k] > trim_threshold:
-                trimmed_start = k
-                break
-
-        # Walk inward from the right
-        trimmed_end = re
-        for k in range(re, rs - 1, -1):
-            if abs_accel[k] > trim_threshold:
-                trimmed_end = k
-                break
-
-        if trimmed_end - trimmed_start >= min_rep_samples:
-            candidate_reps.append((trimmed_start, trimmed_end))
+        candidate_reps.append((rs, re))
 
     # --- First pass: integrate all candidates to measure ROM ---
     def _integrate_rep(rep_start: int, rep_end: int):
@@ -471,7 +452,22 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
     position_m = position * 9.80665
 
     # --- Build rep info ---
+    #
+    # Each rep is decomposed into five contiguous zones:
+    #   [leading_rest | eccentric | top_rest | concentric | trailing_rest]
+    #
+    # - top_rest: walk from position peak on smoothed |velocity|
+    # - leading_rest: walk forward from rep start (near-zero velocity)
+    # - trailing_rest: walk backward from rep end (near-zero velocity)
+    # - bottom_rest between reps = trailing(N) + leading(N+1)  (second pass)
+
+    rest_smooth_win = max(5, sample_rate // 10)
+    min_rest_width = round(0.7 * sample_rate)  # 0.7 s minimum
+
     reps_info: list[RepInfo] = []
+    _leading_rest_samples: list[int] = []   # per-rep leading rest width
+    _trailing_rest_samples: list[int] = []  # per-rep trailing rest width
+
     for i, (rs, re) in enumerate(reps_raw):
         peak_pos = float(np.max(position_m[rs : re + 1]))
         min_pos = float(np.min(position_m[rs : re + 1]))
@@ -479,20 +475,9 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
         peak_vel = float(np.max(np.abs(velocity[rs : re + 1])))
         duration = (re - rs) / sample_rate
         avg_vel = round(rom / duration, 4) if duration > 0 else 0.0
-        peak_acc = round(float(np.max(accel[rs : re + 1])) * 9.80665, 3)  # peak upward in m/s²
+        peak_acc = round(float(np.max(accel[rs : re + 1])) * 9.80665, 3)
 
-        # --- Split rep into eccentric (upward) and concentric (downward) phases ---
-        # Find the position peak within this rep — that's where direction reverses.
-        peak_idx = int(rs + np.argmax(position_m[rs : re + 1]))
-
-        # --- Detect intra-rep rest at the top (pause between ecc & con) ---
-        # During a pause, velocity stays near zero for an extended
-        # period.  During a quick turnaround (no pause), velocity
-        # passes through zero in just a few samples.  Use smoothed
-        # |velocity| to find the near-zero region around the position
-        # peak — smoothing bridges isolated noise spikes that would
-        # break a per-sample walk.
-        rest_smooth_win = max(5, sample_rate // 10)
+        # Smoothed |velocity| for this rep (used for all rest detection)
         rep_vel_abs = np.abs(velocity[rs : re + 1])
         smooth_abs_vel = (
             pd.Series(rep_vel_abs)
@@ -506,24 +491,44 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
         vel_rest_thresh = (
             vel_peak * 0.10 * rest_sensitivity if vel_peak > 0 else 0.0
         )
-        peak_local = peak_idx - rs
-        min_rest_width = round(0.7 * sample_rate)  # 0.7 s minimum
+        rep_len_local = len(smooth_abs_vel)
 
-        # Walk left from peak until smoothed |velocity| exceeds threshold
-        rest_local_start = 0  # default: rep start
-        for k in range(peak_local - 1, -1, -1):
+        # --- Leading rest: walk forward from rep start ---
+        ecc_start_local = 0
+        for k in range(rep_len_local):
+            if smooth_abs_vel[k] > vel_rest_thresh:
+                ecc_start_local = k
+                break
+
+        # --- Trailing rest: walk backward from rep end ---
+        con_end_local = rep_len_local - 1
+        for k in range(rep_len_local - 1, -1, -1):
+            if smooth_abs_vel[k] > vel_rest_thresh:
+                con_end_local = k
+                break
+
+        _leading_rest_samples.append(ecc_start_local)
+        _trailing_rest_samples.append((rep_len_local - 1) - con_end_local)
+
+        ecc_start = rs + ecc_start_local
+        con_end = rs + con_end_local
+
+        # --- Top rest: walk from position peak ---
+        peak_idx = int(rs + np.argmax(position_m[rs : re + 1]))
+        peak_local = peak_idx - rs
+
+        rest_local_start = ecc_start_local  # default: eccentric start
+        for k in range(peak_local - 1, ecc_start_local - 1, -1):
             if smooth_abs_vel[k] > vel_rest_thresh:
                 rest_local_start = k + 1
                 break
 
-        # Walk right from peak
-        rest_local_end = len(smooth_abs_vel) - 1  # default: rep end
-        for k in range(peak_local + 1, len(smooth_abs_vel)):
+        rest_local_end = con_end_local  # default: concentric end
+        for k in range(peak_local + 1, con_end_local + 1):
             if smooth_abs_vel[k] > vel_rest_thresh:
                 rest_local_end = k - 1
                 break
 
-        # Only count as rest if the near-zero zone is wide enough (0.7 s)
         if (rest_local_end - rest_local_start) >= min_rest_width:
             rest_start = rs + rest_local_start
             rest_end = rs + rest_local_end
@@ -531,31 +536,12 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
             rest_start = peak_idx
             rest_end = peak_idx
 
+        # Clamp: top rest must not overlap leading/trailing rest
+        rest_start = max(rest_start, ecc_start)
+        rest_end = min(rest_end, con_end)
+
         rest_samples = rest_end - rest_start
         rest_at_top_secs = round(rest_samples / sample_rate, 3) if rest_samples > 1 else 0.0
-
-        # --- Detect intra-rep rest at the bottom (start / end of rep) ---
-        # Same smoothed-|velocity| approach, scanning from the position
-        # minimum instead of the peak.
-        min_idx = int(rs + np.argmin(position_m[rs : re + 1]))
-        min_local = min_idx - rs
-
-        bot_local_start = 0
-        for k in range(min_local - 1, -1, -1):
-            if smooth_abs_vel[k] > vel_rest_thresh:
-                bot_local_start = k + 1
-                break
-
-        bot_local_end = len(smooth_abs_vel) - 1
-        for k in range(min_local + 1, len(smooth_abs_vel)):
-            if smooth_abs_vel[k] > vel_rest_thresh:
-                bot_local_end = k - 1
-                break
-
-        if (bot_local_end - bot_local_start) >= min_rest_width:
-            rest_at_bottom_secs = round((bot_local_end - bot_local_start) / sample_rate, 3)
-        else:
-            rest_at_bottom_secs = 0.0
 
         def _build_phase(p_start: int, p_end: int, phase_rom: float,
                          compute_watts: bool = False) -> PhaseInfo | None:
@@ -582,13 +568,13 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
                 avg_watts=p_watts,
             )
 
-        # Eccentric = upward (position rising from start to rest zone)
-        ecc_rom = abs(float(position_m[rest_start]) - float(position_m[rs]))
-        eccentric = _build_phase(rs, rest_start, ecc_rom, compute_watts=True)
+        # Eccentric = from motion start to top rest start
+        ecc_rom = abs(float(position_m[rest_start]) - float(position_m[ecc_start]))
+        eccentric = _build_phase(ecc_start, rest_start, ecc_rom, compute_watts=True)
 
-        # Concentric = downward (position falling from rest zone to end)
-        con_rom = abs(float(position_m[rest_end]) - float(position_m[re]))
-        concentric = _build_phase(rest_end, re, con_rom, compute_watts=False)
+        # Concentric = from top rest end to motion end
+        con_rom = abs(float(position_m[rest_end]) - float(position_m[con_end]))
+        concentric = _build_phase(rest_end, con_end, con_rom, compute_watts=False)
 
         reps_info.append(
             RepInfo(
@@ -608,9 +594,20 @@ def analyze_csv(csv_content: str | bytes, sample_rate: int = 100,
                     if weight_kg > 0 and duration > 0 else None
                 ),
                 rest_at_top_seconds=rest_at_top_secs if rest_at_top_secs > 0 else None,
-                rest_at_bottom_seconds=rest_at_bottom_secs if rest_at_bottom_secs > 0 else None,
+                rest_at_bottom_seconds=None,  # filled in second pass below
             )
         )
+
+    # --- Second pass: bottom rest = trailing(N) + leading(N+1) ---
+    # The valley boundary splits the bottom pause between adjacent reps.
+    # Combining trailing rest of rep N with leading rest of rep N+1
+    # recovers the full pause duration reliably.
+    for i in range(len(reps_info)):
+        trailing = _trailing_rest_samples[i]
+        leading_next = _leading_rest_samples[i + 1] if i + 1 < len(reps_info) else 0
+        total_bottom = trailing + leading_next
+        if total_bottom >= min_rest_width:
+            reps_info[i].rest_at_bottom_seconds = round(total_bottom / sample_rate, 3)
 
     # --- Downsample for charting ---
     max_pts = 1500

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Container,
@@ -17,6 +17,8 @@ import {
     Alert,
     Badge,
     ActionIcon,
+    SimpleGrid,
+    Divider,
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
@@ -41,6 +43,28 @@ const SESSION_TYPES = [
     { value: 'squat', label: 'Squat' },
 ];
 
+type SortOption = 'date_desc' | 'date_asc' | 'name_asc';
+
+const SORT_OPTIONS = [
+    { value: 'date_desc', label: 'Date (Newest)' },
+    { value: 'date_asc', label: 'Date (Oldest)' },
+    { value: 'name_asc', label: 'Name (A–Z)' },
+];
+
+function sortSessions(list: Session[], sort: SortOption): Session[] {
+    return [...list].sort((a, b) => {
+        switch (sort) {
+            case 'date_asc':
+                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            case 'name_asc':
+                return a.name.localeCompare(b.name);
+            case 'date_desc':
+            default:
+                return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+    });
+}
+
 export default function SessionsPage() {
     const navigate = useNavigate();
     
@@ -50,8 +74,8 @@ export default function SessionsPage() {
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<number | null>(null);
 
-    // Filter & search state
-    const [filterType, setFilterType] = useState<string | null>(null);
+    // Sort & search state
+    const [sortBy, setSortBy] = useState<SortOption>('date_desc');
     const [searchQuery, setSearchQuery] = useState('');
 
     // Modal state
@@ -137,75 +161,67 @@ export default function SessionsPage() {
         });
     }
 
-    // Filtered sessions
-    const filteredSessions = sessions.filter((s) => {
-        const matchesType = !filterType || s.session_type === filterType;
+    // Search-filtered then sorted sessions, grouped by type
+    const filtered = useMemo(() => {
         const query = searchQuery.toLowerCase().trim();
-        const matchesSearch =
-            !query ||
-            s.name.toLowerCase().includes(query) ||
-            (s.description && s.description.toLowerCase().includes(query));
-        return matchesType && matchesSearch;
-    });
+        const matched = sessions.filter((s) => {
+            if (!query) return true;
+            return (
+                s.name.toLowerCase().includes(query) ||
+                (s.description && s.description.toLowerCase().includes(query))
+            );
+        });
+        return sortSessions(matched, sortBy);
+    }, [sessions, searchQuery, sortBy]);
 
-    // Get session type label
-    function getSessionTypeLabel(type?: string) {
-        if (!type) return null;
-        const found = SESSION_TYPES.find((t) => t.value === type);
-        return found ? found.label : type;
-    }
+    const sessionsByType = useMemo(() => {
+        const grouped: Record<string, Session[]> = {};
+        for (const t of SESSION_TYPES) {
+            grouped[t.value] = filtered.filter((s) => s.session_type === t.value);
+        }
+        return grouped;
+    }, [filtered]);
 
-    // Render session card
+    // Render a compact session card (no type badge since column gives context)
     function renderSessionCard(session: Session) {
         return (
             <Card 
                 key={session.id} 
                 shadow="sm" 
-                padding="md" 
+                padding="sm" 
                 withBorder
                 style={{ cursor: 'pointer' }}
                 onClick={() => navigate(`/sessions/${session.id}`)}
             >
                 <Group justify="space-between" wrap="nowrap" align="flex-start">
-                    <Stack gap="xs" style={{ flex: 1 }}>
-                        <Group gap="sm">
-                            <Text fw={600} size="lg">
-                                {session.name}
-                            </Text>
-                            {session.session_type && (
-                                <Badge color="blue" variant="light">
-                                    {getSessionTypeLabel(session.session_type)}
-                                </Badge>
-                            )}
-                        </Group>
+                    <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
+                        <Text fw={600} size="sm" truncate>
+                            {session.name}
+                        </Text>
                         {session.description && (
-                            <Text size="sm" c="dimmed">
+                            <Text size="xs" c="dimmed" lineClamp={1}>
                                 {session.description}
                             </Text>
                         )}
                         <Group gap="xs">
-                            <IconCalendar size={14} color="gray" />
+                            <IconCalendar size={12} color="gray" />
                             <Text size="xs" c="dimmed">
                                 {formatDate(session.created_at)}
                             </Text>
                         </Group>
                         <Group gap="xs">
                             {session.sets?.length > 0 && (
-                                <Badge size="sm" variant="outline">
+                                <Badge size="xs" variant="outline">
                                     {session.sets.length} set(s)
-                                </Badge>
-                            )}
-                            {session.graph_images?.length > 0 && (
-                                <Badge size="sm" variant="outline">
-                                    {session.graph_images.length} graph(s)
                                 </Badge>
                             )}
                         </Group>
                     </Stack>
-                    <Group gap="xs" align="center">
+                    <Group gap={4} align="center" wrap="nowrap">
                         <ActionIcon
                             color="red"
                             variant="subtle"
+                            size="sm"
                             onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteSession(session.id);
@@ -213,12 +229,68 @@ export default function SessionsPage() {
                             loading={actionLoading === session.id}
                             title="Delete session"
                         >
-                            <IconTrash size={18} />
+                            <IconTrash size={14} />
                         </ActionIcon>
-                        <IconChevronRight size={20} color="gray" />
+                        <IconChevronRight size={16} color="gray" />
                     </Group>
                 </Group>
             </Card>
+        );
+    }
+
+    // Format a date string to just the date portion for grouping
+    function formatDateLabel(dateString: string) {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    }
+
+    // Render a column for one session type, with date separators
+    function renderTypeColumn(typeValue: string, label: string) {
+        const list = sessionsByType[typeValue] ?? [];
+
+        // Group sessions by date label
+        const grouped: { date: string; sessions: Session[] }[] = [];
+        for (const s of list) {
+            const dateLabel = formatDateLabel(s.created_at);
+            const last = grouped[grouped.length - 1];
+            if (last && last.date === dateLabel) {
+                last.sessions.push(s);
+            } else {
+                grouped.push({ date: dateLabel, sessions: [s] });
+            }
+        }
+        const needsSeparators = grouped.length > 1;
+
+        return (
+            <Stack gap="sm" key={typeValue}>
+                <Group justify="space-between" align="center">
+                    <Title order={4}>{label}</Title>
+                    <Badge size="sm" variant="light">{list.length}</Badge>
+                </Group>
+                {list.length === 0 ? (
+                    <Text size="sm" c="dimmed" ta="center" py="md">
+                        No sessions
+                    </Text>
+                ) : (
+                    <Stack gap="xs">
+                        {grouped.map((g, i) => (
+                            <Stack gap="xs" key={g.date}>
+                                {needsSeparators && (
+                                    <Divider
+                                        label={g.date}
+                                        labelPosition="center"
+                                        mt={i > 0 ? 'xs' : 0}
+                                    />
+                                )}
+                                {g.sessions.map(renderSessionCard)}
+                            </Stack>
+                        ))}
+                    </Stack>
+                )}
+            </Stack>
         );
     }
 
@@ -237,7 +309,7 @@ export default function SessionsPage() {
 
     return (
         <Box style={layoutWrapperStyles}>
-            <Container size="md" py="xl" px={{ base: 'sm', sm: 'md' }}>
+            <Container size="xl" py="xl" px={{ base: 'sm', sm: 'md' }}>
                 <Stack gap="xl">
                     {/* Header */}
                     <Group justify="space-between" align="center">
@@ -250,7 +322,7 @@ export default function SessionsPage() {
                         </Button>
                     </Group>
 
-                    {/* Search & Filter */}
+                    {/* Search & Sort */}
                     <Group gap="sm" align="flex-end">
                         <TextInput
                             leftSection={<IconSearch size={16} />}
@@ -260,11 +332,10 @@ export default function SessionsPage() {
                             style={{ flex: 1, maxWidth: 350 }}
                         />
                         <Select
-                            placeholder="All types"
-                            data={SESSION_TYPES}
-                            value={filterType}
-                            onChange={setFilterType}
-                            clearable
+                            placeholder="Sort by"
+                            data={SORT_OPTIONS}
+                            value={sortBy}
+                            onChange={(val) => setSortBy((val as SortOption) || 'date_desc')}
                             style={{ maxWidth: 200 }}
                         />
                     </Group>
@@ -281,30 +352,25 @@ export default function SessionsPage() {
                         </Alert>
                     )}
 
-                    {/* Sessions List */}
-                    <Stack gap="sm">
-                        {filteredSessions.length === 0 ? (
-                            <Card shadow="sm" padding="xl" withBorder>
-                                <Stack align="center" gap="md">
-                                    <Text c="dimmed" ta="center">
-                                        {sessions.length === 0
-                                            ? "You don't have any sessions yet."
-                                            : 'No sessions match the selected filter.'}
-                                    </Text>
-                                    {sessions.length === 0 && (
-                                        <Button
-                                            leftSection={<IconPlus size={16} />}
-                                            onClick={openCreateModal}
-                                        >
-                                            Create Your First Session
-                                        </Button>
-                                    )}
-                                </Stack>
-                            </Card>
-                        ) : (
-                            filteredSessions.map(renderSessionCard)
-                        )}
-                    </Stack>
+                    {sessions.length === 0 ? (
+                        <Card shadow="sm" padding="xl" withBorder>
+                            <Stack align="center" gap="md">
+                                <Text c="dimmed" ta="center">
+                                    You don't have any sessions yet.
+                                </Text>
+                                <Button
+                                    leftSection={<IconPlus size={16} />}
+                                    onClick={openCreateModal}
+                                >
+                                    Create Your First Session
+                                </Button>
+                            </Stack>
+                        </Card>
+                    ) : (
+                        <SimpleGrid cols={{ base: 1, sm: 2, md: 3 }} spacing="lg">
+                            {SESSION_TYPES.map((t) => renderTypeColumn(t.value, t.label))}
+                        </SimpleGrid>
+                    )}
                 </Stack>
             </Container>
 

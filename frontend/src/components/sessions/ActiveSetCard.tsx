@@ -31,17 +31,40 @@ import type { AccelDataPoint } from '../../services/livedata';
 import LiveAccelChart from './LiveAccelChart';
 import { formatDate, formatFileSize, getDownloadUrl } from './sessionUtils';
 
+export interface SetComparison {
+    hoveredSetName: string;
+    avgRomDiff: number | null;       // cm, positive = active is higher
+    avgRestTopDiff: number | null;    // seconds
+    avgRestBottomDiff: number | null; // seconds
+    avgVelUpDiff: number | null;      // m/s (concentric peak)
+    avgVelDownDiff: number | null;    // m/s (eccentric peak)
+}
+
 interface ActiveSetCardProps {
     serialStatus: SerialStatus;
     lastSet: WorkoutSet | null;
     liveAz: number | null;
     actionLoading: string | null;
     analysisLoading: Record<number, boolean>;
+    comparison: SetComparison | null;
     onToggleRecording: () => void;
     onCreateNewSet: () => void;
     onAnalyze: (dataId: number) => void;
     onLiveData: (point: AccelDataPoint) => void;
     onUpdateSet?: (setId: number, data: UpdateSetData) => Promise<void>;
+}
+
+function ComparisonIndicator({ diff, unit, label }: { diff: number | null; unit: string; label: string }) {
+    const color = diff != null && diff > 0 ? 'green' : diff != null && diff < 0 ? 'red' : 'dimmed';
+    const sign = diff != null && diff > 0 ? '+' : '';
+    return (
+        <Group gap={4}>
+            <Text size="sm" c="dimmed">{label}:</Text>
+            <Text size="sm" fw={600} c={color}>
+                {diff != null ? `${sign}${diff.toFixed(2)} ${unit}` : '—'}
+            </Text>
+        </Group>
+    );
 }
 
 export default function ActiveSetCard({
@@ -50,6 +73,7 @@ export default function ActiveSetCard({
     liveAz,
     actionLoading,
     analysisLoading,
+    comparison,
     onToggleRecording,
     onCreateNewSet,
     onAnalyze,
@@ -195,6 +219,7 @@ export default function ActiveSetCard({
                             </Group>
                         </Stack>
                     ) : (
+                        <>
                         <Group justify="space-between" align="center">
                             <Stack gap={4}>
                                 <Text fw={500}>
@@ -228,6 +253,17 @@ export default function ActiveSetCard({
                                 )}
                             </Group>
                         </Group>
+                        <div style={{ visibility: comparison ? 'visible' : 'hidden' }}>
+                            <Divider label={comparison ? `vs ${comparison.hoveredSetName}` : '\u00A0'} labelPosition="center" />
+                            <Stack gap={4}>
+                                <ComparisonIndicator diff={comparison?.avgRomDiff ?? null} unit="cm" label="Avg ROM" />
+                                <ComparisonIndicator diff={comparison?.avgRestTopDiff ?? null} unit="s" label="Avg Rest (Top)" />
+                                <ComparisonIndicator diff={comparison?.avgRestBottomDiff ?? null} unit="s" label="Avg Rest (Bottom)" />
+                                <ComparisonIndicator diff={comparison?.avgVelUpDiff ?? null} unit="m/s" label="Peak Vel Up" />
+                                <ComparisonIndicator diff={comparison?.avgVelDownDiff ?? null} unit="m/s" label="Peak Vel Down" />
+                            </Stack>
+                        </div>
+                        </>
                     )
                 ) : (
                     <Text c="dimmed" ta="center" py="md">

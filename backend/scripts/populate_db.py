@@ -11,7 +11,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 
 from auth import get_password_hash
-from models import Base, User, Session, Friendship, FriendshipStatus
+from models import Base, User, Session
 
 # Load environment variables
 load_dotenv()
@@ -186,37 +186,6 @@ async def create_test_sessions(db: AsyncSession, user1: User, user2: User, user3
     await db.commit()
 
 
-async def create_friendship(db: AsyncSession, user1: User, user2: User):
-    """Create accepted friendship between two users"""
-    # Check if friendship already exists
-    result = await db.execute(
-        select(Friendship).where(
-            ((Friendship.requester_id == user1.id) & (Friendship.addressee_id == user2.id)) |
-            ((Friendship.requester_id == user2.id) & (Friendship.addressee_id == user1.id))
-        )
-    )
-    existing_friendship = result.scalar_one_or_none()
-
-    if existing_friendship:
-        print("✅ Friendship already exists between test users")
-        return existing_friendship
-
-    # Create accepted friendship
-    friendship = Friendship(
-        requester_id=user1.id,
-        addressee_id=user2.id,
-        status=FriendshipStatus.ACCEPTED,
-    )
-
-    db.add(friendship)
-    await db.commit()
-    await db.refresh(friendship)
-
-    print("✅ Created friendship between testuser and testuser2")
-
-    return friendship
-
-
 async def populate_database():
     """Main function to populate the database"""
     print("=" * 60)
@@ -228,13 +197,12 @@ async def populate_database():
         await conn.run_sync(Base.metadata.create_all)
         print("✅ Database tables created")
 
-    # Create test users, sessions, and friendship
+    # Create test users and sessions
     async with AsyncSessionLocal() as db:
         user1 = await create_test_user(db)
         user2 = await create_test_user2(db)
         user3 = await create_test_user3(db)
         await create_test_sessions(db, user1, user2, user3)
-        await create_friendship(db, user1, user2)
 
     print("=" * 60)
     print("✅ DATABASE POPULATION COMPLETE")

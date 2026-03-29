@@ -41,7 +41,7 @@ export default function Navbar() {
         { label: 'Home', path: '/' },
         { label: 'Sessions', path: '/sessions' },
         { label: 'Live Data', path: '/live' },
-        { label: 'Friends', path: '/friends' },
+
     ];
 
     // User menu content

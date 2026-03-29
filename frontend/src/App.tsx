@@ -12,9 +12,6 @@ import RegisterPage from './pages/auth/RegisterPage.tsx';
 import SessionsPage from './pages/sessions/SessionsPage';
 import SessionDetailPage from './pages/sessions/SessionDetailPage';
 
-// Friends pages
-import FriendsPage from './pages/friends/FriendsPage';
-
 // Profile pages
 import ProfilePage from './pages/profile/ProfilePage';
 import EditProfilePage from './pages/profile/EditProfilePage';
@@ -77,18 +74,6 @@ export default function App() {
                             <ProtectedRoute>
                                 <Layout>
                                     <LiveDataPage />
-                                </Layout>
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    {/* Friends routes */}
-                    <Route
-                        path="/friends"
-                        element={
-                            <ProtectedRoute>
-                                <Layout>
-                                    <FriendsPage />
                                 </Layout>
                             </ProtectedRoute>
                         }

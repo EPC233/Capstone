@@ -21,6 +21,7 @@ import {
     analyzeAccelerometerData,
     type Session,
     type WorkoutSet,
+    type RepInfo,
     type AnalysisResult,
     type UpdateSessionData,
     type UpdateSetData,
@@ -33,7 +34,7 @@ import {
 } from '../../services/livedata';
 import SessionHeader from '../../components/sessions/SessionHeader';
 import SessionInfoCard from '../../components/sessions/SessionInfoCard';
-import ActiveSetCard from '../../components/sessions/ActiveSetCard';
+import ActiveSetCard, { type SetComparison } from '../../components/sessions/ActiveSetCard';
 import SetDetailsCard from '../../components/sessions/SetDetailsCard';
 import GraphImagesCard from '../../components/sessions/GraphImagesCard';
 
@@ -69,6 +70,9 @@ export default function SessionDetailPage() {
     // Track user-selected active set (null = default to most recent)
     const [selectedSetId, setSelectedSetId] = useState<number | null>(null);
 
+    // Track which set is being hovered in SetDetailsCard for comparison
+    const [hoveredSetId, setHoveredSetId] = useState<number | null>(null);
+
     // Stable callback for LiveAccelChart – updates liveAz on each data point
     const handleLiveData = useMemo(
         () => (point: AccelDataPoint) => setLiveAz(point.az_world),
@@ -86,6 +90,46 @@ export default function SessionDetailPage() {
             ? session.sets.find((s) => s.id === selectedSetId) ?? null
             : [...session.sets].sort((a, b) => b.set_number - a.set_number)[0] ?? null)
         : null;
+
+    // Compute comparison between active set and hovered set
+    const setComparison: SetComparison | null = useMemo(() => {
+        if (!hoveredSetId || !lastSet || hoveredSetId === lastSet.id) return null;
+        const hoveredSet = session?.sets?.find((s) => s.id === hoveredSetId);
+        if (!hoveredSet) return null;
+
+        function avgField(reps: WorkoutSet['rep_details'], getter: (r: RepInfo) => number | null | undefined): number | null {
+            if (!reps?.length) return null;
+            const vals = reps.map(getter).filter((v): v is number => v != null);
+            return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+        }
+
+        const activeReps = lastSet!.rep_details ?? [];
+        const hoveredReps = hoveredSet.rep_details ?? [];
+
+        const activeAvgRom = avgField(activeReps, (r) => r.rom_cm);
+        const hoveredAvgRom = avgField(hoveredReps, (r) => r.rom_cm);
+        const activeAvgRestTop = avgField(activeReps, (r) => r.rest_at_top_seconds);
+        const hoveredAvgRestTop = avgField(hoveredReps, (r) => r.rest_at_top_seconds);
+        const activeAvgRestBottom = avgField(activeReps, (r) => r.rest_at_bottom_seconds);
+        const hoveredAvgRestBottom = avgField(hoveredReps, (r) => r.rest_at_bottom_seconds);
+        const activeAvgVelUp = avgField(activeReps, (r) => r.concentric?.peak_velocity);
+        const hoveredAvgVelUp = avgField(hoveredReps, (r) => r.concentric?.peak_velocity);
+        const activeAvgVelDown = avgField(activeReps, (r) => r.eccentric?.peak_velocity);
+        const hoveredAvgVelDown = avgField(hoveredReps, (r) => r.eccentric?.peak_velocity);
+
+        function diff(a: number | null, b: number | null): number | null {
+            return a != null && b != null ? a - b : null;
+        }
+
+        return {
+            hoveredSetName: hoveredSet.name || `Set ${hoveredSet.set_number}`,
+            avgRomDiff: diff(activeAvgRom, hoveredAvgRom),
+            avgRestTopDiff: diff(activeAvgRestTop, hoveredAvgRestTop),
+            avgRestBottomDiff: diff(activeAvgRestBottom, hoveredAvgRestBottom),
+            avgVelUpDiff: diff(activeAvgVelUp, hoveredAvgVelUp),
+            avgVelDownDiff: diff(activeAvgVelDown, hoveredAvgVelDown),
+        };
+    }, [hoveredSetId, lastSet, session?.sets]);
 
     // Handle toggle recording (start / stop)
     async function handleToggleRecording() {
@@ -243,6 +287,24 @@ export default function SessionDetailPage() {
         }
     }
 
+    // Look up the set that owns a given accelerometer data ID
+    function findSetByDataId(dataId: number): WorkoutSet | undefined {
+        return session?.sets?.find((s) => s.accelerometer_data?.id === dataId);
+    }
+
+    // Update local session rep_details for a set after analysis (avoids full reload)
+    function updateSetRepDetails(dataId: number, reps: RepInfo[]) {
+        setSession((prev) => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                sets: prev.sets?.map((s) =>
+                    s.accelerometer_data?.id === dataId ? { ...s, rep_details: reps } : s,
+                ),
+            };
+        });
+    }
+
     // Handle analyze accelerometer data
     async function handleAnalyze(dataId: number) {
         // Toggle visibility if already loaded
@@ -251,15 +313,22 @@ export default function SessionDetailPage() {
             return;
         }
 
+        // Seed weight from the set's weight_kg if not already set by the user
+        const setWeight = findSetByDataId(dataId)?.weight_kg ?? 0;
+        if (weightKg[dataId] === undefined && setWeight) {
+            setWeightKg((prev) => ({ ...prev, [dataId]: setWeight }));
+        }
+
         try {
             setAnalysisLoading((prev) => ({ ...prev, [dataId]: true }));
             setError(null);
             const romThreshold = minRomCm[dataId] ?? 15.0;
-            const restSens = restSensitivity[dataId] ?? 1.0;
-            const weight = weightKg[dataId] ?? 0;
+            const restSens = restSensitivity[dataId] ?? 1.2;
+            const weight = weightKg[dataId] ?? setWeight;
             const result = await analyzeAccelerometerData(dataId, { min_rom_cm: romThreshold, rest_sensitivity: restSens, weight_kg: weight });
             setAnalyses((prev) => ({ ...prev, [dataId]: result }));
             setAnalysisOpen((prev) => ({ ...prev, [dataId]: true }));
+            updateSetRepDetails(dataId, result.reps);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Analysis failed');
         } finally {
@@ -273,10 +342,12 @@ export default function SessionDetailPage() {
             setAnalysisLoading((prev) => ({ ...prev, [dataId]: true }));
             setError(null);
             const romThreshold = minRomCm[dataId] ?? 15.0;
-            const restSens = restSensitivity[dataId] ?? 1.0;
-            const weight = weightKg[dataId] ?? 0;
+            const restSens = restSensitivity[dataId] ?? 1.2;
+            const setWeight = findSetByDataId(dataId)?.weight_kg ?? 0;
+            const weight = weightKg[dataId] ?? setWeight;
             const result = await analyzeAccelerometerData(dataId, { min_rom_cm: romThreshold, rest_sensitivity: restSens, weight_kg: weight });
             setAnalyses((prev) => ({ ...prev, [dataId]: result }));
+            updateSetRepDetails(dataId, result.reps);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Re-analysis failed');
         } finally {
@@ -297,19 +368,6 @@ export default function SessionDetailPage() {
         }
     }
 
-    // Handle delete graph image
-    async function handleDeleteGraphImage(imageId: number) {
-        try {
-            setActionLoading(`graph-${imageId}`);
-            await deleteGraphImage(imageId);
-            await loadSession();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : 'Failed to delete image');
-        } finally {
-            setActionLoading(null);
-        }
-    }
-
     // Callbacks for analysis parameter changes
     function handleMinRomCmChange(dataId: number, value: number) {
         setMinRomCm((prev) => ({ ...prev, [dataId]: value }));
@@ -319,6 +377,13 @@ export default function SessionDetailPage() {
     }
     function handleWeightKgChange(dataId: number, value: number) {
         setWeightKg((prev) => ({ ...prev, [dataId]: value }));
+    }
+    function handleCloseAllAnalysis() {
+        setAnalysisOpen((prev) => {
+            const next: Record<number, boolean> = {};
+            for (const key of Object.keys(prev)) next[Number(key)] = false;
+            return next;
+        });
     }
 
     if (loading) {
@@ -396,6 +461,7 @@ export default function SessionDetailPage() {
                         liveAz={liveAz}
                         actionLoading={actionLoading}
                         analysisLoading={analysisLoading}
+                        comparison={setComparison}
                         onToggleRecording={handleToggleRecording}
                         onCreateNewSet={handleCreateNewSet}
                         onAnalyze={handleAnalyze}
@@ -423,12 +489,9 @@ export default function SessionDetailPage() {
                         onMinRomCmChange={handleMinRomCmChange}
                         onRestSensitivityChange={handleRestSensitivityChange}
                         onWeightKgChange={handleWeightKgChange}
-                    />
-
-                    <GraphImagesCard
-                        graphImages={session.graph_images || []}
-                        actionLoading={actionLoading}
-                        onDeleteGraphImage={handleDeleteGraphImage}
+                        onCloseAllAnalysis={handleCloseAllAnalysis}
+                        onSetHover={setHoveredSetId}
+                        onSetHoverEnd={() => setHoveredSetId(null)}
                     />
                 </Stack>
             </Container>

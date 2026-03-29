@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import {
     Title,
     Text,
@@ -17,6 +17,7 @@ import {
     IconTrash,
     IconPlayerRecord,
     IconPlayerStop,
+    IconX,
 } from '@tabler/icons-react';
 import type { WorkoutSet, AnalysisResult } from '../../services/sessions';
 import type { SerialStatus } from '../../services/livedata';
@@ -36,13 +37,16 @@ interface SetDetailsCardProps {
     restSensitivity: Record<number, number>;
     weightKg: Record<number, number>;
     onRecordToSet: (setId: number) => void;
-    onSelectSet: (setId: number) => void;
+    onSelectSet: (setId: number | null) => void;
     onAnalyze: (dataId: number) => void;
     onReanalyze: (dataId: number) => void;
     onDeleteSet: (setId: number) => void;
     onMinRomCmChange: (dataId: number, value: number) => void;
     onRestSensitivityChange: (dataId: number, value: number) => void;
     onWeightKgChange: (dataId: number, value: number) => void;
+    onCloseAllAnalysis?: () => void;
+    onSetHover?: (setId: number) => void;
+    onSetHoverEnd?: () => void;
 }
 
 export default function SetDetailsCard({
@@ -65,7 +69,28 @@ export default function SetDetailsCard({
     onMinRomCmChange,
     onRestSensitivityChange,
     onWeightKgChange,
+    onCloseAllAnalysis,
+    onSetHover,
+    onSetHoverEnd,
 }: SetDetailsCardProps) {
+    const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const handleClick = useCallback((setId: number) => {
+        if (clickTimer.current) clearTimeout(clickTimer.current);
+        clickTimer.current = setTimeout(() => {
+            onSelectSet(activeSetId === setId ? null : setId);
+            clickTimer.current = null;
+        }, 200);
+    }, [activeSetId, onSelectSet]);
+
+    const handleDoubleClick = useCallback((dataId: number | undefined) => {
+        if (clickTimer.current) {
+            clearTimeout(clickTimer.current);
+            clickTimer.current = null;
+        }
+        if (dataId) onAnalyze(dataId);
+    }, [onAnalyze]);
+
     return (
         <Card shadow="sm" padding="lg" withBorder>
             <Stack gap="md">
@@ -74,7 +99,19 @@ export default function SetDetailsCard({
                         <IconBarbell size={20} />
                         <Title order={4}>Set Details</Title>
                     </Group>
-                    <Badge>{sets.length || 0} set(s)</Badge>
+                    <Group gap="xs">
+                        {Object.values(analysisOpen).some(Boolean) && (
+                            <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                onClick={onCloseAllAnalysis}
+                                title="Close all analysis panels"
+                            >
+                                <IconX size={16} />
+                            </ActionIcon>
+                        )}
+                        <Badge>{sets.length || 0} set(s)</Badge>
+                    </Group>
                 </Group>
                 <Divider />
                 {sets.length > 0 ? (
@@ -92,20 +129,21 @@ export default function SetDetailsCard({
                         <Table.Tbody>
                             {[...sets]
                                 .sort((a, b) => a.set_number - b.set_number)
-                                .map((s: WorkoutSet) => {
+                                .map((s: WorkoutSet, index: number, sortedSets: WorkoutSet[]) => {
                                     const accel = s.accelerometer_data;
                                     const dataId = accel?.id;
+                                    const isLast = index === sortedSets.length - 1;
                                     return (
                                         <React.Fragment key={s.id}>
                                             <Table.Tr
-                                                onClick={() => onSelectSet(s.id)}
-                                                onDoubleClick={() => {
-                                                    if (dataId) onAnalyze(dataId);
-                                                }}
+                                                onClick={() => handleClick(s.id)}
+                                                onDoubleClick={() => handleDoubleClick(dataId)}
+                                                onMouseEnter={() => onSetHover?.(s.id)}
+                                                onMouseLeave={() => onSetHoverEnd?.()}
                                                 style={{
                                                     cursor: 'pointer',
                                                     background:
-                                                        activeSetId === s.id
+                                                        activeSetId === s.id && !isLast
                                                             ? 'var(--mantine-color-blue-light)'
                                                             : undefined,
                                                 }}
@@ -226,7 +264,7 @@ export default function SetDetailsCard({
                                                             restSensitivity={
                                                                 restSensitivity[dataId] ?? 1.0
                                                             }
-                                                            weightKg={weightKg[dataId] ?? 0}
+                                                            weightKg={weightKg[dataId] ?? s.weight_kg ?? 0}
                                                             onMinRomCmChange={onMinRomCmChange}
                                                             onRestSensitivityChange={
                                                                 onRestSensitivityChange

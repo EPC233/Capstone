@@ -47,16 +47,18 @@ export default function SessionHeader({
     onDeleteSession,
 }: SessionHeaderProps) {
     return (
-        <Group justify="space-between" align="flex-start">
-            <Stack gap="xs">
-                <Button
-                    leftSection={<IconArrowLeft size={16} />}
-                    variant="subtle"
-                    onClick={onNavigateBack}
-                    p={0}
-                >
-                    Back to Sessions
-                </Button>
+        <Stack gap="xs">
+            <Button
+                leftSection={<IconArrowLeft size={16} />}
+                variant="subtle"
+                onClick={onNavigateBack}
+                p={0}
+                w="fit-content"
+            >
+                Back to Sessions
+            </Button>
+            <Group justify="space-between" align="flex-start">
+                <Stack gap="xs">
                 {editing ? (
                     <Stack gap="sm">
                         <TextInput
@@ -126,16 +128,17 @@ export default function SessionHeader({
                         </ActionIcon>
                     </Group>
                 )}
-            </Stack>
-            <Button
-                color="red"
-                variant="outline"
-                leftSection={<IconTrash size={16} />}
-                onClick={onDeleteSession}
-                loading={actionLoading === 'session'}
-            >
-                Delete Session
-            </Button>
-        </Group>
+                </Stack>
+                <Button
+                    color="red"
+                    variant="outline"
+                    leftSection={<IconTrash size={16} />}
+                    onClick={onDeleteSession}
+                    loading={actionLoading === 'session'}
+                >
+                    Delete Session
+                </Button>
+            </Group>
+        </Stack>
     );
 }

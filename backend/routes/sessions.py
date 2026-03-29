@@ -344,7 +344,7 @@ async def analyze_accelerometer_data(
     smooth_window: int = 11,
     min_rep_samples: int = 20,
     min_rom_cm: float = 3.0,
-    rest_sensitivity: float = 1.0,
+    rest_sensitivity: float = 1.2,
     weight_kg: float = 0.0,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),

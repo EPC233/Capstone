@@ -73,15 +73,15 @@ export default function SetAnalysisPanel({
                         <Slider
                             value={restSensitivity}
                             onChange={(val) => onRestSensitivityChange(dataId, val)}
-                            min={0.1}
-                            max={5.0}
+                            min={0}
+                            max={2.0}
                             step={0.1}
                             marks={[
+                                { value: 0, label: '0' },
+                                { value: 0.5, label: '0.5' },
                                 { value: 1, label: '1' },
+                                { value: 1.5, label: '1.5' },
                                 { value: 2, label: '2' },
-                                { value: 3, label: '3' },
-                                { value: 4, label: '4' },
-                                { value: 5, label: '5' },
                             ]}
                             label={(val) => `${val}`}
                             color="teal"

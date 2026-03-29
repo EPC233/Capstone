@@ -16,7 +16,6 @@ from database import engine
 from models import (  # noqa: F401
     AccelerometerData,
     Base,
-    Friendship,
     GraphImage,
     RepDetail,
     Set,
@@ -25,7 +24,6 @@ from models import (  # noqa: F401
 )
 from routes import (
     auth,
-    friends,
     sessions,
     serial,
 )
@@ -62,7 +60,6 @@ app.add_middleware(
 
 # Include API routers
 app.include_router(auth.router, prefix="/api")
-app.include_router(friends.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(serial.router, prefix="/api")
 
