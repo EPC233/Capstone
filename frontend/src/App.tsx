@@ -7,6 +7,8 @@ import Layout from './components/layout/Layout.tsx';
 // Auth pages
 import LoginPage from './pages/auth/LoginPage.tsx';
 import RegisterPage from './pages/auth/RegisterPage.tsx';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.tsx';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage.tsx';
 
 // Session pages
 import SessionsPage from './pages/sessions/SessionsPage';
@@ -32,6 +34,8 @@ export default function App() {
                     {/* Public routes */}
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/reset-password-request" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
 
                     {/* Protected routes */}
                     <Route

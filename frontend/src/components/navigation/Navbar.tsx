@@ -9,9 +9,12 @@ import {
     UnstyledButton,
     Stack,
     Box,
+    ActionIcon,
+    useMantineColorScheme,
+    useComputedColorScheme,
 } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
-import { IconLogout, IconUser, IconChevronDown } from '@tabler/icons-react';
+import { IconLogout, IconUser, IconChevronDown, IconSun, IconMoon } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ConnectionIndicator from './ConnectionIndicator';
 
@@ -25,6 +28,12 @@ export default function Navbar() {
     const navigate = useNavigate();
     const location = useLocation();
     const isMobile = useMediaQuery('(max-width: 768px)');
+    const { setColorScheme } = useMantineColorScheme();
+    const computedColorScheme = useComputedColorScheme('light');
+
+    function toggleColorScheme() {
+        setColorScheme(computedColorScheme === 'dark' ? 'light' : 'dark');
+    }
 
     function handleLogout() {
         logout();
@@ -103,7 +112,7 @@ export default function Navbar() {
                     onClick={() => navigate('/profile')}
                     style={{
                         backgroundColor: location.pathname === '/profile'
-                            ? 'var(--mantine-color-blue-0)'
+                            ? 'var(--mantine-color-primary-0)'
                             : undefined,
                     }}
                 >
@@ -124,13 +133,13 @@ export default function Navbar() {
         <Box
             style={{
                 position: 'fixed',
-                backgroundColor: 'var(--mantine-color-white)',
+                backgroundColor: 'var(--mantine-color-body)',
                 top: 0,
                 left: 0,
                 right: 0,
                 width: '100%',
                 zIndex: 1000,
-                borderBottom: '1px solid var(--mantine-color-gray-2)',
+                borderBottom: '1px solid var(--mantine-color-default-border)',
                 boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
             }}
         >
@@ -173,6 +182,18 @@ export default function Navbar() {
                                 {link.label}
                             </Button>
                         ))}
+                        <ActionIcon
+                            variant="default"
+                            size="lg"
+                            onClick={toggleColorScheme}
+                            aria-label="Toggle color scheme"
+                        >
+                            {computedColorScheme === 'dark' ? (
+                                <IconSun size={18} />
+                            ) : (
+                                <IconMoon size={18} />
+                            )}
+                        </ActionIcon>
                         {renderUserMenu()}
                     </Group>
                 </Group>

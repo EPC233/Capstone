@@ -11,7 +11,7 @@ function main() {
     }
     const root = createRoot(rootEl);
     root.render(
-        <MantineProvider theme={theme}>
+        <MantineProvider theme={theme} defaultColorScheme="auto">
             <App />
         </MantineProvider>
     );

@@ -12,21 +12,26 @@ from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     authenticate_user,
     create_access_token,
+    create_password_reset_token,
     get_current_active_user,
     get_password_hash,
     get_user_by_email,
     get_user_by_username,
     security_scheme,
+    verify_password_reset_token,
 )
 from database import get_db
 from models.user import User
 from schemas.auth import (
+    PasswordResetForm,
+    PasswordResetRequest,
     Token,
     UserCreate,
     UserLogin,
     UserProfileUpdate,
     UserResponse,
 )
+from services.email_service import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -160,6 +165,65 @@ async def update_my_profile(
     await db.refresh(current_user)
 
     return current_user
+
+
+@router.post("/forgot-password", status_code=200)
+async def forgot_password(
+    data: PasswordResetRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Request a password reset email.
+    Always returns 200 to avoid leaking whether the email exists.
+    """
+    email = data.email.strip().lower()
+    user = await get_user_by_email(email, db)
+    if user:
+        token = create_password_reset_token(user.id, user.email)
+        send_password_reset_email(user.email, token)
+    return {"message": "If an account with that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=200)
+async def reset_password(
+    data: PasswordResetForm,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Reset password using a valid token.
+    """
+    payload = verify_password_reset_token(data.token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid token payload",
+        )
+
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User not found",
+        )
+
+    new_password = data.new_password.strip()
+    if len(new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 6 characters",
+        )
+
+    user.hashed_password = get_password_hash(new_password)
+    await db.commit()
+    return {"message": "Password has been reset successfully."}
 
 
 @router.get(

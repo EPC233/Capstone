@@ -57,6 +57,12 @@ class UserProfileUpdate(BaseModel):
     avatar_url: Optional[str] = None
 
 
+class PasswordResetRequest(BaseModel):
+    """Schema for requesting a password reset email"""
+
+    email: EmailStr
+
+
 class PasswordResetForm(BaseModel):
     """Schema for submitting password reset with token"""
 
