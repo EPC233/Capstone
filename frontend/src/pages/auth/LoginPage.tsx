@@ -61,16 +61,13 @@ export default function LoginPage() {
 
             const data = (await response.json()) as { access_token: string };
 
-            // Use auth context to login (updates state)
             await login(data.access_token);
 
             setSuccess(true);
 
-            // Reset form
             setUsername('');
             setPassword('');
 
-            // Redirect to home after authentication is confirmed
             setTimeout(() => {
                 navigate('/');
             }, 500);

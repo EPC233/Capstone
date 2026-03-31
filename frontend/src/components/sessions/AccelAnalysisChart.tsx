@@ -2,11 +2,10 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { Stack, Title, Paper, Group, Badge, Table, Box } from '@mantine/core';
 import type { AnalysisResult } from '../../services/sessions';
 
-// Colours matching PlotDataMagwick.py
 const COLORS = {
-    accel: '#40c057',   // green
-    velocity: '#228be6', // blue
-    position: '#fa5252', // red / tab:green mapped to green
+    accel: '#40c057',
+    velocity: '#228be6',
+    position: '#fa5252',
     repShades: [
         'rgba(255,107,107,0.15)',
         'rgba(81,207,102,0.15)',
@@ -30,9 +29,6 @@ interface ChartCanvasProps {
     height?: number;
 }
 
-/**
- * Single canvas subplot (acceleration, velocity, or position).
- */
 function ChartCanvas({
     title,
     indices,

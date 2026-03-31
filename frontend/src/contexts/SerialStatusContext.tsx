@@ -9,9 +9,7 @@ import { useAuth } from './AuthContext';
 
 interface SerialStatusContextValue {
     status: SerialStatus;
-    /** True when BLE is the active connection (not USB serial) */
     bleConnected: boolean;
-    /** True if this browser supports Web Bluetooth */
     bleSupported: boolean;
     refreshStatus: () => Promise<void>;
 }
@@ -42,7 +40,6 @@ export function SerialStatusProvider({ children }: { children: ReactNode }) {
     const [bleConnected, setBleConnected] = useState(false);
     const bleSupported = checkBleSupport();
 
-    // Merge BLE status into the shared status shape
     const mergeStatus = useCallback(() => {
         const ble = getBleStatus();
         if (ble.connected) {
@@ -58,20 +55,17 @@ export function SerialStatusProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
-    // Subscribe to BLE status changes
     useEffect(() => {
         const unsub = onBleStatusChange(mergeStatus);
         return unsub;
     }, [mergeStatus]);
 
     const refreshStatus = useCallback(async () => {
-        // If BLE is the active connection, just read its state
         const ble = getBleStatus();
         if (ble.connected) {
             mergeStatus();
             return;
         }
-        // Otherwise poll the backend USB serial status
         try {
             const data = await getSerialStatus();
             setStatus(data);
@@ -86,10 +80,8 @@ export function SerialStatusProvider({ children }: { children: ReactNode }) {
             return;
         }
 
-        // Fetch immediately
         refreshStatus();
 
-        // Poll periodically
         const interval = setInterval(refreshStatus, POLL_INTERVAL_MS);
         return () => clearInterval(interval);
     }, [isAuthenticated, refreshStatus]);

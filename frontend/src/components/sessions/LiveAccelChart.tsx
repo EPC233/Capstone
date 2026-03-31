@@ -9,20 +9,11 @@ import { isBleConnected, onBleData } from '../../services/bluetooth';
 const MAX_CHART_POINTS = 300;
 
 export interface LiveAccelChartProps {
-    /** Whether the chart should actively stream data. When false the socket is closed. */
     active?: boolean;
-    /** Canvas height in CSS pixels (default 200) */
     height?: number;
-    /** Called with each incoming data point (e.g. to track latest az_world) */
     onData?: (point: AccelDataPoint) => void;
 }
 
-/**
- * Self-contained live accelerometer chart.
- *
- * Opens a WebSocket, buffers the last `MAX_CHART_POINTS` samples and renders
- * an animated canvas chart of the three world-frame acceleration axes.
- */
 export default function LiveAccelChart({
     active = true,
     height = 200,
@@ -32,13 +23,11 @@ export default function LiveAccelChart({
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const animFrameRef = useRef<number>(0);
     const socketRef = useRef<ReturnType<typeof createLiveDataSocket> | null>(null);
-    // Keep callback ref up-to-date without re-opening socket
     const onDataRef = useRef(onData);
     useEffect(() => {
         onDataRef.current = onData;
     }, [onData]);
 
-    // ---- Data source lifecycle (BLE or WebSocket) ----
     useEffect(() => {
         if (!active) {
             if (socketRef.current) {
@@ -56,13 +45,11 @@ export default function LiveAccelChart({
             onDataRef.current?.(point);
         };
 
-        // If BLE is connected, subscribe to BLE data instead of WebSocket
         if (isBleConnected()) {
             const unsub = onBleData(pushPoint);
             return () => { unsub(); };
         }
 
-        // Otherwise use WebSocket
         if (!socketRef.current) {
             const sock = createLiveDataSocket();
             socketRef.current = sock;
@@ -83,7 +70,6 @@ export default function LiveAccelChart({
         };
     }, [active]);
 
-    // ---- Canvas animation loop ----
     useEffect(() => {
         const draw = () => {
             const canvas = canvasRef.current;
@@ -106,7 +92,6 @@ export default function LiveAccelChart({
             const W = rect.width;
             const H = rect.height;
 
-            // Background
             ctx.fillStyle = '#1a1b1e';
             ctx.fillRect(0, 0, W, H);
 
@@ -120,7 +105,6 @@ export default function LiveAccelChart({
                 return;
             }
 
-            // Channels: Z (vertical), X, Y
             const channels: {
                 key: keyof AccelDataPoint;
                 color: string;
@@ -131,7 +115,6 @@ export default function LiveAccelChart({
                 { key: 'ay_world', color: '#fa5252', label: 'Y' },
             ];
 
-            // Auto-scale Y
             let minVal = Infinity;
             let maxVal = -Infinity;
             for (const p of buf) {
@@ -182,7 +165,6 @@ export default function LiveAccelChart({
                 ctx.stroke();
             }
 
-            // Legend (vertical stack, top-right)
             ctx.clearRect(W - 130, 2, 128, channels.length * 16 + 4);
             ctx.fillStyle = 'rgba(26,27,30,0.85)';
             ctx.fillRect(W - 130, 2, 128, channels.length * 16 + 4);

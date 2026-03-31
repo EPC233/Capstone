@@ -1,7 +1,4 @@
-version: '3.8'
-
 services:
-  # PostgreSQL Database Service
   db:
     build:
       context: ./database
@@ -16,21 +13,19 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      # Test actual database connectivity, not just process readiness
       test: ["CMD-SHELL", "pg_isready -U postgres -d fitness_tracker_db"]
       interval: 2s
       timeout: 3s
       retries: 10
       start_period: 10s
 
-  # FastAPI Backend Service
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
     container_name: fitness_tracker_backend
     env_file:
-      - .env  # Load environment variables from .env file in project root
+      - .env
     ports:
       - "8000:8000"
     depends_on:
@@ -38,12 +33,9 @@ services:
         condition: service_healthy
     volumes:
       - ./backend:/app
-      # Mount uploads directory to persist files and make them accessible from host
-      # This overrides the ./backend:/app mount for the uploads subdirectory
       - ./backend/uploads:/app/uploads
     command: poetry run uvicorn server:app --host 0.0.0.0 --port 8000 --reload
 
-  # React Frontend Service
   frontend:
     build:
       context: ./frontend
@@ -60,8 +52,6 @@ services:
       - backend
     command: npm run dev -- --host 0.0.0.0
 
-  # Database population service (run once to create test user)
-  # Usage: docker-compose run --rm populate
   populate:
     build:
       context: ./backend
@@ -76,8 +66,6 @@ services:
       - ./backend:/app
     command: poetry run python scripts/populate_db.py
     profiles:
-      - tools  # Only runs when explicitly called
-
+      - tools
 volumes:
   postgres_data:
-  # Note: uploads are stored in ./backend/uploads via bind mount (see backend service)
