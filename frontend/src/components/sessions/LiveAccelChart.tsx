@@ -5,6 +5,7 @@ import {
     type AccelDataPoint,
 } from '../../services/livedata';
 import { isBleConnected, onBleData } from '../../services/bluetooth';
+import { colorScheme, hexToRgba } from '../../colorScheme';
 
 const MAX_CHART_POINTS = 300;
 
@@ -92,12 +93,12 @@ export default function LiveAccelChart({
             const W = rect.width;
             const H = rect.height;
 
-            ctx.fillStyle = '#1a1b1e';
+            ctx.fillStyle = colorScheme.dark.background;
             ctx.fillRect(0, 0, W, H);
 
             const buf = chartBuffer.current;
             if (buf.length < 2) {
-                ctx.fillStyle = '#666';
+                ctx.fillStyle = colorScheme.dark.textMuted;
                 ctx.font = '14px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText('Waiting for data…', W / 2, H / 2);
@@ -110,9 +111,9 @@ export default function LiveAccelChart({
                 color: string;
                 label: string;
             }[] = [
-                { key: 'az_world', color: '#40c057', label: 'Z (vertical)' },
-                { key: 'ax_world', color: '#228be6', label: 'X' },
-                { key: 'ay_world', color: '#fa5252', label: 'Y' },
+                { key: 'az_world', color: colorScheme.semantic.success, label: 'Z (vertical)' },
+                { key: 'ax_world', color: colorScheme.semantic.info, label: 'X' },
+                { key: 'ay_world', color: colorScheme.semantic.error, label: 'Y' },
             ];
 
             let minVal = Infinity;
@@ -132,7 +133,7 @@ export default function LiveAccelChart({
             const startIdx = MAX_CHART_POINTS - buf.length;
 
             // Zero line
-            ctx.strokeStyle = '#333';
+            ctx.strokeStyle = colorScheme.dark.border;
             ctx.lineWidth = 0.5;
             const zeroY = H - ((0 - minVal) / (maxVal - minVal)) * H;
             ctx.beginPath();
@@ -141,7 +142,7 @@ export default function LiveAccelChart({
             ctx.stroke();
 
             // Y-axis labels
-            ctx.fillStyle = '#888';
+            ctx.fillStyle = colorScheme.dark.textSecondary;
             ctx.font = '11px monospace';
             ctx.textAlign = 'left';
             ctx.fillText(`${maxVal.toFixed(1)} m/s²`, 4, 14);
@@ -166,7 +167,7 @@ export default function LiveAccelChart({
             }
 
             ctx.clearRect(W - 130, 2, 128, channels.length * 16 + 4);
-            ctx.fillStyle = 'rgba(26,27,30,0.85)';
+            ctx.fillStyle = hexToRgba(colorScheme.dark.background, 0.85);
             ctx.fillRect(W - 130, 2, 128, channels.length * 16 + 4);
             for (let ci = 0; ci < channels.length; ci++) {
                 const ch = channels[ci];
@@ -174,7 +175,7 @@ export default function LiveAccelChart({
                 const yPos = 16 + ci * 16;
                 ctx.fillStyle = ch.color;
                 ctx.fillRect(W - 124, yPos - 6, 14, 3);
-                ctx.fillStyle = '#ccc';
+                ctx.fillStyle = colorScheme.dark.text;
                 ctx.font = '11px sans-serif';
                 ctx.textAlign = 'left';
                 ctx.fillText(ch.label, W - 106, yPos);
@@ -192,7 +193,7 @@ export default function LiveAccelChart({
             radius="md"
             style={{
                 overflow: 'hidden',
-                background: '#1a1b1e',
+                background: colorScheme.dark.background,
             }}
         >
             <canvas

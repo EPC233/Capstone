@@ -17,6 +17,7 @@ import { useMediaQuery } from '@mantine/hooks';
 import { IconLogout, IconUser, IconChevronDown, IconSun, IconMoon } from '@tabler/icons-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ConnectionIndicator from './ConnectionIndicator';
+import { colorScheme } from '../../colorScheme';
 
 interface NavLink {
     label: string;
@@ -162,7 +163,7 @@ export default function Navbar() {
                             size="lg"
                             component={Link}
                             to="/"
-                            c="blue.6"
+                            c={colorScheme.brand.primary}
                             style={{ textDecoration: 'none', flexShrink: 0 }}
                         >
                             Fitness Tracker

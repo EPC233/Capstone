@@ -41,10 +41,10 @@ export default function SetAnalysisPanel({
 }: SetAnalysisPanelProps) {
     return (
         <Collapse in={isOpen}>
-            <Box p="md" style={{ background: 'var(--mantine-color-gray-1)' }}>
+            <Box p="md" style={{ background: 'var(--mantine-color-default-hover)' }}>
                 <Group mb="sm" align="flex-end">
                     <Box style={{ flex: 1, maxWidth: 300 }}>
-                        <Text size="xs" c="black" mb={4}>
+                        <Text size="xs" mb={4}>
                             Min ROM threshold (cm)
                         </Text>
                         <Slider
@@ -63,11 +63,11 @@ export default function SetAnalysisPanel({
                             label={(val) => `${val} cm`}
                             color="grape"
                             size="sm"
-                            styles={{ markLabel: { color: 'black' } }}
+                            styles={{ markLabel: { color: 'var(--mantine-color-text)' } }}
                         />
                     </Box>
                     <Box style={{ flex: 1, maxWidth: 300 }}>
-                        <Text size="xs" c="black" mb={4}>
+                        <Text size="xs" mb={4}>
                             Rest detection sensitivity
                         </Text>
                         <Slider
@@ -86,11 +86,11 @@ export default function SetAnalysisPanel({
                             label={(val) => `${val}`}
                             color="teal"
                             size="sm"
-                            styles={{ markLabel: { color: 'black' } }}
+                            styles={{ markLabel: { color: 'var(--mantine-color-text)' } }}
                         />
                     </Box>
                     <Box style={{ width: 120 }}>
-                        <Text size="xs" c="black" mb={4}>
+                        <Text size="xs" mb={4}>
                             Weight (kg)
                         </Text>
                         <NumberInput

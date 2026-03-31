@@ -15,6 +15,7 @@ import QuickStatsCard from '../../components/home/QuickStatsCard';
 import RecentSessionsCard from '../../components/home/RecentSessionsCard';
 import SerialStatusCard from '../../components/home/SerialStatusCard';
 import QuickCreateSessionCard from '../../components/home/QuickCreateSessionCard';
+import { colorScheme } from '../../colorScheme';
 
 export default function HomePage() {
     const navigate = useNavigate();
@@ -50,19 +51,13 @@ export default function HomePage() {
                         order={1}
                         style={{
                             textAlign: 'center',
-                            color: 'var(--mantine-color-blue-6)',
+                            color: colorScheme.brand.primary,
                             fontSize: '2.5rem',
                         }}
                     >
                         Fitness Tracker
                     </Title>
-                    <Text
-                        size="lg"
-                        style={{
-                            textAlign: 'center',
-                            color: 'var(--mantine-color-gray-7)',
-                        }}
-                    >
+                    <Text size="lg" c="dimmed" ta="center">
                         Track your sessions and accelerometer data.
                     </Text>
 

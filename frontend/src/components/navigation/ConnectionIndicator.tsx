@@ -1,5 +1,6 @@
 import { Group, Text } from '@mantine/core';
 import { useSerialStatus } from '../../contexts/SerialStatusContext';
+import { colorScheme } from '../../colorScheme';
 
 const dotBase: React.CSSProperties = {
     width: 10,
@@ -23,15 +24,15 @@ export default function ConnectionIndicator() {
     let shouldBlink: boolean;
 
     if (status.recording) {
-        color = '#fa5252'; // red
+        color = colorScheme.semantic.error;
         label = 'Recording';
         shouldBlink = true;
     } else if (status.connected) {
-        color = '#12b886';
+        color = colorScheme.semantic.success;
         label = 'Connected';
         shouldBlink = true;
     } else {
-        color = '#adb5bd'; // gray
+        color = '#9CA3AF';
         label = 'Disconnected';
         shouldBlink = false;
     }

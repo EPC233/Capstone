@@ -1,20 +1,21 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { Stack, Title, Paper, Group, Badge, Table, Box } from '@mantine/core';
 import type { AnalysisResult } from '../../services/sessions';
+import { colorScheme, hexToRgba } from '../../colorScheme';
 
 const COLORS = {
-    accel: '#40c057',
-    velocity: '#228be6',
-    position: '#fa5252',
+    accel: colorScheme.semantic.success,
+    velocity: colorScheme.semantic.info,
+    position: colorScheme.semantic.error,
     repShades: [
-        'rgba(255,107,107,0.15)',
-        'rgba(81,207,102,0.15)',
-        'rgba(74,144,226,0.15)',
-        'rgba(255,195,0,0.15)',
-        'rgba(190,75,219,0.15)',
-        'rgba(255,146,43,0.15)',
-        'rgba(32,201,151,0.15)',
-        'rgba(134,142,150,0.15)',
+        hexToRgba(colorScheme.semantic.error, 0.15),
+        hexToRgba(colorScheme.semantic.success, 0.15),
+        hexToRgba(colorScheme.semantic.info, 0.15),
+        hexToRgba(colorScheme.semantic.warning, 0.15),
+        hexToRgba(colorScheme.brand.secondary, 0.15),
+        hexToRgba(colorScheme.module.purple, 0.15),
+        hexToRgba(colorScheme.module.blue2, 0.15),
+        hexToRgba(colorScheme.module.gray, 0.15),
     ],
 };
 
@@ -64,11 +65,11 @@ function ChartCanvas({
         const plotH = H - PAD_T - PAD_B;
 
         // Background
-        ctx.fillStyle = '#1a1b1e';
+        ctx.fillStyle = colorScheme.dark.background;
         ctx.fillRect(0, 0, W, H);
 
         // Title
-        ctx.fillStyle = '#ddd';
+        ctx.fillStyle = colorScheme.dark.text;
         ctx.font = 'bold 12px sans-serif';
         ctx.textAlign = 'left';
         ctx.fillText(title, PAD_L, 16);
@@ -97,7 +98,7 @@ function ChartCanvas({
         }
 
         // Grid lines
-        ctx.strokeStyle = '#333';
+        ctx.strokeStyle = colorScheme.dark.border;
         ctx.lineWidth = 0.5;
         const gridSteps = 4;
         for (let gi = 0; gi <= gridSteps; gi++) {
@@ -110,7 +111,7 @@ function ChartCanvas({
 
         // Zero line
         if (minVal < 0 && maxVal > 0) {
-            ctx.strokeStyle = '#666';
+            ctx.strokeStyle = colorScheme.dark.textMuted;
             ctx.lineWidth = 0.8;
             const zy = yScale(0);
             ctx.beginPath();
@@ -120,7 +121,7 @@ function ChartCanvas({
         }
 
         // Y-axis labels
-        ctx.fillStyle = '#888';
+        ctx.fillStyle = colorScheme.dark.textSecondary;
         ctx.font = '10px monospace';
         ctx.textAlign = 'right';
         for (let gi = 0; gi <= gridSteps; gi++) {
@@ -133,7 +134,7 @@ function ChartCanvas({
         ctx.save();
         ctx.translate(12, PAD_T + plotH / 2);
         ctx.rotate(-Math.PI / 2);
-        ctx.fillStyle = '#aaa';
+        ctx.fillStyle = colorScheme.dark.textSecondary;
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(yLabel, 0, 0);
@@ -192,7 +193,7 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
             </Group>
 
             {/* Charts */}
-            <Paper radius="md" style={{ overflow: 'hidden', background: '#1a1b1e' }}>
+            <Paper radius="md" style={{ overflow: 'hidden', background: colorScheme.dark.background }}>
                 <ChartCanvas
                     title="Smoothed Z-Axis Acceleration (World Frame, Gravity Removed)"
                     indices={chart.time_samples}
@@ -205,7 +206,7 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                 />
             </Paper>
 
-            <Paper radius="md" style={{ overflow: 'hidden', background: '#1a1b1e' }}>
+            <Paper radius="md" style={{ overflow: 'hidden', background: colorScheme.dark.background }}>
                 <ChartCanvas
                     title="Estimated Z-Axis Velocity (Drift-Corrected per Rep)"
                     indices={chart.time_samples}
@@ -218,7 +219,7 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                 />
             </Paper>
 
-            <Paper radius="md" style={{ overflow: 'hidden', background: '#1a1b1e' }}>
+            <Paper radius="md" style={{ overflow: 'hidden', background: colorScheme.dark.background }}>
                 <ChartCanvas
                     title="Estimated Z-Axis Position (Drift-Corrected per Rep)"
                     indices={chart.time_samples}
@@ -302,7 +303,7 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                                         <Table.Td>
                                             {rep.rest_at_top_seconds}s
                                         </Table.Td>
-                                        <Table.Td colSpan={7} style={{ color: '#888', fontStyle: 'italic' }}>
+                                        <Table.Td colSpan={7} style={{ color: 'var(--mantine-color-dimmed)', fontStyle: 'italic' }}>
                                             Pause at top of rep
                                         </Table.Td>
                                     </Table.Tr>
@@ -342,7 +343,7 @@ export default function AccelAnalysisChart({ analysis }: AccelAnalysisChartProps
                                         <Table.Td>
                                             {rep.rest_at_bottom_seconds}s
                                         </Table.Td>
-                                        <Table.Td colSpan={7} style={{ color: '#888', fontStyle: 'italic' }}>
+                                        <Table.Td colSpan={7} style={{ color: 'var(--mantine-color-dimmed)', fontStyle: 'italic' }}>
                                             Pause at bottom of rep
                                         </Table.Td>
                                     </Table.Tr>
