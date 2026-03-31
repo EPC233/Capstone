@@ -44,11 +44,6 @@ def _session_query_options():
     ]
 
 
-# ------------------------------------------------------------------
-# Session CRUD
-# ------------------------------------------------------------------
-
-
 @router.post("", response_model=SessionResponse, status_code=201)
 async def create_session(
     session_data: SessionCreate,
@@ -159,10 +154,6 @@ async def delete_session(
     return None
 
 
-# ------------------------------------------------------------------
-# Set CRUD
-# ------------------------------------------------------------------
-
 
 @router.post("/{session_id}/sets", response_model=SetResponse, status_code=201)
 async def create_set(
@@ -180,7 +171,6 @@ async def create_set(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # Determine set number
     count_result = await db.execute(
         select(Set).where(Set.session_id == session_id)
     )
@@ -233,7 +223,6 @@ async def update_set(
     await db.commit()
     await db.refresh(s)
 
-    # Re-query with joined load to get full response
     result = await db.execute(
         select(Set)
         .where(Set.id == set_id)
@@ -271,10 +260,6 @@ async def delete_set(
     return None
 
 
-# ------------------------------------------------------------------
-# Accelerometer data (attached to a Set)
-# ------------------------------------------------------------------
-
 
 @router.post("/sets/{set_id}/accelerometer", response_model=SetResponse, status_code=201)
 async def upload_accelerometer_data(
@@ -298,7 +283,6 @@ async def upload_accelerometer_data(
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
-    # Remove existing accel data if overwriting
     if s.accelerometer_data:
         if os.path.exists(s.accelerometer_data.file_path):
             os.remove(s.accelerometer_data.file_path)
@@ -365,7 +349,6 @@ async def analyze_accelerometer_data(
     if not os.path.exists(data.file_path):
         raise HTTPException(status_code=404, detail="CSV file not found on disk")
 
-    # Try to extract real recording duration from the description
     recording_duration: float | None = None
     if data.description:
         import re
@@ -395,10 +378,8 @@ async def analyze_accelerometer_data(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 
-    # ── Persist rep details to the database ──
     set_id = data.set_id
 
-    # Delete existing rep details for this set
     await db.execute(
         select(RepDetail).where(RepDetail.set_id == set_id)
     )
@@ -485,11 +466,6 @@ async def delete_accelerometer_data(
     await db.delete(data)
     await db.commit()
     return None
-
-
-# ------------------------------------------------------------------
-# Graph images (still attached to Session)
-# ------------------------------------------------------------------
 
 
 @router.post("/{session_id}/graph", response_model=GraphImageResponse, status_code=201)

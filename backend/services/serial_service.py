@@ -91,10 +91,6 @@ class SerialService:
         self._lock = asyncio.Lock()
         self._running = False
 
-    # ------------------------------------------------------------------
-    # Connection management
-    # ------------------------------------------------------------------
-
     @property
     def is_connected(self) -> bool:
         return self._connected and self._serial is not None and self._serial.is_open
@@ -172,10 +168,6 @@ class SerialService:
             self._port = None
             return {"status": "disconnected", "port": port}
 
-    # ------------------------------------------------------------------
-    # Recording
-    # ------------------------------------------------------------------
-
     async def start_recording(self) -> dict:
         if not self.is_connected:
             return {"status": "error", "detail": "Not connected to Arduino"}
@@ -213,10 +205,6 @@ class SerialService:
             "csv": csv_content,
         }
 
-    # ------------------------------------------------------------------
-    # WebSocket subscriber management
-    # ------------------------------------------------------------------
-
     def subscribe(self) -> asyncio.Queue:
         """Create a new subscriber queue for live data."""
         queue: asyncio.Queue = asyncio.Queue(maxsize=200)
@@ -225,10 +213,6 @@ class SerialService:
 
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         self._subscribers.discard(queue)
-
-    # ------------------------------------------------------------------
-    # Internal
-    # ------------------------------------------------------------------
 
     async def _skip_header(self) -> None:
         """Read and discard lines until we get valid numeric data."""

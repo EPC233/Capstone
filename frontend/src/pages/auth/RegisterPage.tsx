@@ -28,7 +28,6 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // If already authenticated, redirect to home
   if (isAuthenticated) {
     return <Navigate to="/" replace />;
   }
@@ -39,21 +38,18 @@ export default function RegisterPage() {
     setError(null);
     setSuccess(false);
 
-    // Validate passwords match
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setLoading(false);
       return;
     }
 
-    // Validate password format (min 6 chars + at least one number)
     if (password.length < 6 || !/\d/.test(password)) {
       setError("Password must be at least 6 characters and contain a number");
       setLoading(false);
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       setError("Please enter a valid email address");
@@ -89,7 +85,6 @@ export default function RegisterPage() {
 
       setSuccess(true);
 
-      // Redirect to login after successful registration
       setTimeout(() => {
         navigate("/login");
       }, 2000);

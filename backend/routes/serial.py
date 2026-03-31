@@ -33,10 +33,6 @@ UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.d
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
-# ------------------------------------------------------------------
-# REST endpoints
-# ------------------------------------------------------------------
-
 @router.get("/ports")
 async def get_ports(
     current_user: User = Depends(get_current_active_user),
@@ -106,9 +102,7 @@ async def stop_recording(
 
     csv_content: str = result.pop("csv", "")
 
-    # If a session_id was provided, persist the CSV
     if session_id is not None and csv_content:
-        # Verify session ownership
         stmt = select(Session).where(
             Session.id == session_id, Session.user_id == current_user.id
         )
@@ -118,7 +112,6 @@ async def stop_recording(
         if session is None:
             result["save_error"] = "Session not found or not owned by user"
         else:
-            # If a specific set_id was provided, look it up directly
             if set_id is not None:
                 set_stmt = select(Set).where(
                     Set.id == set_id, Set.session_id == session_id
@@ -130,12 +123,10 @@ async def stop_recording(
                     return result
                 new_set = target_set
             else:
-                # Determine set number based on existing sets
                 count_stmt = select(Set).where(Set.session_id == session_id)
                 count_result = await db.execute(count_stmt)
                 existing_sets = count_result.scalars().all()
 
-                # If the last set is empty, reuse it; otherwise create a new one
                 last_empty = None
                 for s in sorted(existing_sets, key=lambda x: x.set_number, reverse=True):
                     if s.status == "empty":
@@ -160,7 +151,6 @@ async def stop_recording(
             with open(file_path, "w") as f:
                 f.write(csv_content)
 
-            # Remove existing accel data on the set if present (e.g. reused empty set)
             if new_set.id:
                 old_accel = await db.execute(
                     select(AccelerometerData).where(
@@ -194,9 +184,6 @@ async def stop_recording(
     return result
 
 
-# ------------------------------------------------------------------
-# BLE CSV upload endpoint (client-side recording)
-# ------------------------------------------------------------------
 
 @router.post("/record/upload")
 async def upload_recording(
@@ -215,9 +202,8 @@ async def upload_recording(
         return {"error": "Empty CSV body"}
 
     lines = [l for l in csv_content.strip().split("\n") if l.strip()]
-    sample_count = max(len(lines) - 1, 0)  # exclude header
+    sample_count = max(len(lines) - 1, 0)
 
-    # Verify session ownership
     stmt = select(Session).where(
         Session.id == session_id, Session.user_id == current_user.id
     )
@@ -227,7 +213,6 @@ async def upload_recording(
     if session is None:
         return {"error": "Session not found or not owned by user"}
 
-    # Find or create target set
     if set_id is not None:
         set_stmt = select(Set).where(
             Set.id == set_id, Set.session_id == session_id
@@ -266,7 +251,6 @@ async def upload_recording(
     with open(file_path, "w") as f:
         f.write(csv_content)
 
-    # Remove existing accel data on the set if present
     if new_set.id:
         old_accel = await db.execute(
             select(AccelerometerData).where(
@@ -301,9 +285,6 @@ async def upload_recording(
     }
 
 
-# ------------------------------------------------------------------
-# WebSocket endpoint for live data streaming
-# ------------------------------------------------------------------
 
 @router.websocket("/ws")
 async def websocket_live_data(websocket: WebSocket):
@@ -318,7 +299,6 @@ async def websocket_live_data(websocket: WebSocket):
     """
     await websocket.accept()
 
-    # Subscribe to data
     queue = serial_service.subscribe()
 
     try:

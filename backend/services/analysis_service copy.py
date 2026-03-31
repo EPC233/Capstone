@@ -13,8 +13,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-
-# Column names from the GravityCorrectedAccel sketch
 COLUMNS = [
     "ax", "ay", "az",
     "gx", "gy", "gz",
@@ -65,7 +63,6 @@ class AnalysisResult:
     duration_seconds: float
     rep_count: int
     reps: list[RepInfo]
-    # Downsampled time-series for charting (avoid sending 10k+ points)
     time_samples: list[int]
     z_accel: list[float]         # smoothed Z acceleration (g)
     velocity: list[float]        # Z velocity (m/s)

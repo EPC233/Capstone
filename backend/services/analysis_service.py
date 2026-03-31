@@ -13,8 +13,6 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-
-# Column names from the GravityCorrectedAccel sketch
 COLUMNS = [
     "ax", "ay", "az",
     "gx", "gy", "gz",

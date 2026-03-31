@@ -27,7 +27,6 @@ export default function HomePage() {
             const data = await getSessions();
             setSessions(data);
         } catch {
-            // Non-critical — cards will show empty state
         } finally {
             setLoading(false);
         }
@@ -37,11 +36,10 @@ export default function HomePage() {
         loadSessions();
     }, [loadSessions]);
 
-    // Layout wrapper styles
     const layoutWrapperStyles: React.CSSProperties = {
         marginLeft: 0,
         width: '100%',
-        marginTop: '100px', // Account for navbar height
+        marginTop: '100px',
     };
 
     return (

@@ -5,9 +5,6 @@ interface LayoutProps {
     children: React.ReactNode;
 }
 
-/**
- * Layout component that wraps pages with the navbar
- */
 export default function Layout({ children }: LayoutProps) {
     return (
         <Box>

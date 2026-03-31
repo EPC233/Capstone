@@ -44,12 +44,10 @@ async def register(
     """
     Register a new user.
     """
-    # Sanitize input - strip whitespace
     username = user_data.username.strip()
     email = user_data.email.strip()
     password = user_data.password.strip()
 
-    # Validate that fields are not empty after stripping
     if not username:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -66,7 +64,6 @@ async def register(
             detail="Password cannot be empty",
         )
 
-    # Check if username already exists
     existing_user = await get_user_by_username(username, db)
     if existing_user:
         raise HTTPException(
@@ -74,7 +71,6 @@ async def register(
             detail="Username already registered",
         )
 
-    # Check if email already exists
     existing_email = await get_user_by_email(email, db)
     if existing_email:
         raise HTTPException(
@@ -82,7 +78,6 @@ async def register(
             detail="Email already registered",
         )
 
-    # Create new user
     hashed_password = get_password_hash(password)
     db_user = User(
         username=username,
@@ -149,7 +144,6 @@ async def update_my_profile(
     """
     Update the current user's profile fields.
     """
-    # Update profile fields if provided
     if profile_data.first_name is not None:
         current_user.first_name = (
             profile_data.first_name.strip() if profile_data.first_name else None
@@ -244,7 +238,6 @@ async def search_users(
     if not q or len(q) < 2:
         return []
     
-    # Search for users with matching username (case-insensitive)
     result = await db.execute(
         select(User)
         .where(User.username.ilike(f"%{q}%"))

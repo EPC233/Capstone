@@ -24,7 +24,6 @@ export default function ResetPasswordPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    // No token in URL — redirect to forgot password
     if (!token) {
         return <Navigate to="/reset-password-request" replace />;
     }
