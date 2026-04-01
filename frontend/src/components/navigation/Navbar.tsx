@@ -142,6 +142,7 @@ export default function Navbar() {
                 zIndex: 1000,
                 borderBottom: '1px solid var(--mantine-color-default-border)',
                 boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+                boxSizing: 'border-box',
             }}
         >
             <Container

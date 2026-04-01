@@ -346,7 +346,11 @@ async def analyze_accelerometer_data(
     data = result.scalars().first()
     if not data:
         raise HTTPException(status_code=404, detail="Accelerometer data not found")
-    if not os.path.exists(data.file_path):
+    file_path = data.file_path
+    if not os.path.exists(file_path):
+        # Stored path may be an absolute host path; try resolving via UPLOAD_DIR
+        file_path = os.path.join(UPLOAD_DIR, os.path.basename(file_path))
+    if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="CSV file not found on disk")
 
     recording_duration: float | None = None
@@ -360,7 +364,7 @@ async def analyze_accelerometer_data(
             except ValueError:
                 pass
 
-    with open(data.file_path, "r") as f:
+    with open(file_path, "r") as f:
         csv_content = f.read()
 
     try:

@@ -9,6 +9,7 @@ import {
     ActionIcon,
     Table,
     Divider,
+    ScrollArea,
 } from '@mantine/core';
 import {
     IconBarbell,
@@ -115,7 +116,8 @@ export default function SetDetailsCard({
                 </Group>
                 <Divider />
                 {sets.length > 0 ? (
-                    <Table striped highlightOnHover>
+                    <ScrollArea type="auto">
+                    <Table striped highlightOnHover style={{ minWidth: 650 }}>
                         <Table.Thead>
                             <Table.Tr>
                                 <Table.Th>Set</Table.Th>
@@ -280,6 +282,7 @@ export default function SetDetailsCard({
                                 })}
                         </Table.Tbody>
                     </Table>
+                    </ScrollArea>
                 ) : (
                     <Text c="dimmed" ta="center" py="md">
                         No sets recorded yet.

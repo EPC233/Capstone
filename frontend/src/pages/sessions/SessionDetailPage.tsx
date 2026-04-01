@@ -95,11 +95,22 @@ export default function SessionDetailPage() {
             : [...session.sets].sort((a, b) => b.set_number - a.set_number)[0] ?? null)
         : null;
 
-    // Compute comparison between active set and hovered set
+    // Compute comparison between active set and hovered set (or previous set by default)
     const setComparison: SetComparison | null = useMemo(() => {
-        if (!hoveredSetId || !lastSet || hoveredSetId === lastSet.id) return null;
-        const hoveredSet = session?.sets?.find((s) => s.id === hoveredSetId);
-        if (!hoveredSet) return null;
+        if (!lastSet) return null;
+
+        // Determine comparison target: hovered set, or the previous set by set_number
+        let compareSet: WorkoutSet | undefined;
+        if (hoveredSetId && hoveredSetId !== lastSet.id) {
+            compareSet = session?.sets?.find((s) => s.id === hoveredSetId);
+        } else if (!hoveredSetId) {
+            const sorted = [...(session?.sets ?? [])].sort((a, b) => a.set_number - b.set_number);
+            const activeIdx = sorted.findIndex((s) => s.id === lastSet.id);
+            if (activeIdx > 0) {
+                compareSet = sorted[activeIdx - 1];
+            }
+        }
+        if (!compareSet) return null;
 
         function avgField(reps: WorkoutSet['rep_details'], getter: (r: RepInfo) => number | null | undefined): number | null {
             if (!reps?.length) return null;
@@ -108,30 +119,30 @@ export default function SessionDetailPage() {
         }
 
         const activeReps = lastSet!.rep_details ?? [];
-        const hoveredReps = hoveredSet.rep_details ?? [];
+        const compareReps = compareSet.rep_details ?? [];
 
         const activeAvgRom = avgField(activeReps, (r) => r.rom_cm);
-        const hoveredAvgRom = avgField(hoveredReps, (r) => r.rom_cm);
+        const compareAvgRom = avgField(compareReps, (r) => r.rom_cm);
         const activeAvgRestTop = avgField(activeReps, (r) => r.rest_at_top_seconds);
-        const hoveredAvgRestTop = avgField(hoveredReps, (r) => r.rest_at_top_seconds);
+        const compareAvgRestTop = avgField(compareReps, (r) => r.rest_at_top_seconds);
         const activeAvgRestBottom = avgField(activeReps, (r) => r.rest_at_bottom_seconds);
-        const hoveredAvgRestBottom = avgField(hoveredReps, (r) => r.rest_at_bottom_seconds);
+        const compareAvgRestBottom = avgField(compareReps, (r) => r.rest_at_bottom_seconds);
         const activeAvgVelUp = avgField(activeReps, (r) => r.concentric?.peak_velocity);
-        const hoveredAvgVelUp = avgField(hoveredReps, (r) => r.concentric?.peak_velocity);
+        const compareAvgVelUp = avgField(compareReps, (r) => r.concentric?.peak_velocity);
         const activeAvgVelDown = avgField(activeReps, (r) => r.eccentric?.peak_velocity);
-        const hoveredAvgVelDown = avgField(hoveredReps, (r) => r.eccentric?.peak_velocity);
+        const compareAvgVelDown = avgField(compareReps, (r) => r.eccentric?.peak_velocity);
 
         function diff(a: number | null, b: number | null): number | null {
             return a != null && b != null ? a - b : null;
         }
 
         return {
-            hoveredSetName: hoveredSet.name || `Set ${hoveredSet.set_number}`,
-            avgRomDiff: diff(activeAvgRom, hoveredAvgRom),
-            avgRestTopDiff: diff(activeAvgRestTop, hoveredAvgRestTop),
-            avgRestBottomDiff: diff(activeAvgRestBottom, hoveredAvgRestBottom),
-            avgVelUpDiff: diff(activeAvgVelUp, hoveredAvgVelUp),
-            avgVelDownDiff: diff(activeAvgVelDown, hoveredAvgVelDown),
+            hoveredSetName: compareSet.name || `Set ${compareSet.set_number}`,
+            avgRomDiff: diff(activeAvgRom, compareAvgRom),
+            avgRestTopDiff: diff(activeAvgRestTop, compareAvgRestTop),
+            avgRestBottomDiff: diff(activeAvgRestBottom, compareAvgRestBottom),
+            avgVelUpDiff: diff(activeAvgVelUp, compareAvgVelUp),
+            avgVelDownDiff: diff(activeAvgVelDown, compareAvgVelDown),
         };
     }, [hoveredSetId, lastSet, session?.sets]);
 

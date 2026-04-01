@@ -220,6 +220,7 @@ export default function ActiveSetCard({
                                 {lastSet.weight_kg != null && (
                                     <Text size="sm" c="blue">
                                         {lastSet.weight_kg} kg
+                                        {lastSet.rep_details?.length ? ` · ${lastSet.rep_details.length} reps` : ''}
                                     </Text>
                                 )}
                                 <Text size="sm" c="dimmed">

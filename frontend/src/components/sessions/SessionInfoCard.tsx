@@ -6,6 +6,7 @@ import {
     Group,
     Table,
     Divider,
+    ScrollArea,
 } from '@mantine/core';
 import { IconClipboardText, IconCalendar } from '@tabler/icons-react';
 import type { Session, WorkoutSet } from '../../services/sessions';
@@ -115,7 +116,8 @@ export default function SessionInfoCard({ session, editing }: SessionInfoCardPro
                     <>
                         <Divider />
                         <Title order={5}>Set Summary</Title>
-                        <Table striped highlightOnHover withTableBorder>
+                        <ScrollArea type="auto">
+                        <Table striped highlightOnHover withTableBorder style={{ minWidth: 700 }}>
                             <Table.Thead>
                                 <Table.Tr>
                                     <Table.Th>Set</Table.Th>
@@ -135,6 +137,7 @@ export default function SessionInfoCard({ session, editing }: SessionInfoCardPro
                                 ))}
                             </Table.Tbody>
                         </Table>
+                        </ScrollArea>
                     </>
                 )}
             </Stack>
