@@ -5,7 +5,7 @@
  * client-side recording with CSV upload to the backend.
  */
 
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, getAuthHeaders, handleResponse } from '../utils/api';
 import type { AccelDataPoint } from './livedata';
 
 // ---- BLE UUIDs (must match Arduino firmware) --------------------------------
@@ -117,6 +117,28 @@ export function isBluetoothSupported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
 }
 
+// Error message
+export function bluetoothUnsupportedReason(): string | null {
+    if (isBluetoothSupported()) return null;
+
+    const ua = navigator.userAgent.toLowerCase();
+    const isFirefox = ua.includes('firefox');
+    const isChromium = ua.includes('chrome') || ua.includes('chromium') || ua.includes('brave');
+    const isLinux = ua.includes('linux');
+    const isSecure = window.isSecureContext;
+
+    if (isFirefox) {
+        return 'Firefox does not support Web Bluetooth. Use Chrome or Brave instead.';
+    }
+    if (!isSecure) {
+        return 'Web Bluetooth requires a secure context. Access the app via https:// or http://localhost.';
+    }
+    if (isChromium && isLinux) {
+        return 'On Linux, enable chrome://flags/#enable-web-bluetooth then restart the browser.';
+    }
+    return 'Web Bluetooth is not supported in this browser. Use Chrome or Brave.';
+}
+
 /** Check if currently connected to a BLE device */
 export function isBleConnected(): boolean {
     return device?.gatt?.connected === true;
@@ -137,8 +159,9 @@ export function getBleStatus() {
  * This triggers the browser's Bluetooth pairing dialog.
  */
 export async function connectBle(): Promise<{ status: string; port?: string }> {
-    if (!isBluetoothSupported()) {
-        throw new Error('Web Bluetooth is not supported in this browser');
+    const reason = bluetoothUnsupportedReason();
+    if (reason) {
+        throw new Error(reason);
     }
 
     // Request device with the IMU service
@@ -237,26 +260,20 @@ export async function stopBleRecording(
     // Upload to backend if session specified
     if (sessionId != null) {
         const API = getApiUrl();
-        const token = localStorage.getItem('auth_token');
         const params = new URLSearchParams();
         params.set('session_id', String(sessionId));
         if (setId != null) params.set('set_id', String(setId));
 
+        const headers = getAuthHeaders(false);
+        headers['Content-Type'] = 'text/csv';
+
         const res = await fetch(`${API}/serial/record/upload?${params.toString()}`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'text/csv',
-                ...(token && { Authorization: `Bearer ${token}` }),
-            },
+            headers,
             body: csv,
         });
 
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({ detail: 'Upload failed' }));
-            throw new Error((err as { detail?: string }).detail || 'Upload failed');
-        }
-
-        const result = await res.json();
+        const result = await handleResponse<Record<string, unknown>>(res);
         return {
             status: 'recording_stopped',
             sample_count: sampleCount,

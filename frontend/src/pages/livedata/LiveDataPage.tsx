@@ -21,6 +21,8 @@ import {
     IconRefresh,
     IconActivity,
     IconDeviceFloppy,
+    IconBluetooth,
+    IconUsb,
 } from '@tabler/icons-react';
 import LiveAccelChart from '../../components/sessions/LiveAccelChart';
 import {
@@ -34,12 +36,28 @@ import {
     type SerialStatus,
     type AccelDataPoint,
 } from '../../services/livedata';
+import {
+    isBluetoothSupported,
+    connectBle,
+    disconnectBle,
+    startBleRecording,
+    stopBleRecording,
+    getBleStatus,
+    onBleStatusChange,
+} from '../../services/bluetooth';
 import { getSessions, type Session } from '../../services/sessions';
 
+type ConnectionSource = 'usb' | 'ble';
+
 export default function LiveDataPage() {
+    // Connection source toggle
+    const [source, setSource] = useState<ConnectionSource>('usb');
+    const bleSupported = isBluetoothSupported();
+
     // Connection state
     const [ports, setPorts] = useState<SerialPort[]>([]);
     const [selectedPort, setSelectedPort] = useState<string | null>(null);
+    const [bleStatus, setBleStatus] = useState(getBleStatus);
     const [status, setStatus] = useState<SerialStatus | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -54,8 +72,29 @@ export default function LiveDataPage() {
     const [saveSessionId, setSaveSessionId] = useState<string | null>(null);
     const [recordingSamples, setRecordingSamples] = useState(0);
 
+    // Derived state — must be before effects that reference them
+    const connected = source === 'ble' ? bleStatus.connected : (status?.connected ?? false);
+    const recording = source === 'ble' ? bleStatus.recording : (status?.recording ?? false);
+
+    // Keep BLE status in sync
+    useEffect(() => {
+        return onBleStatusChange(() => setBleStatus(getBleStatus()));
+    }, []);
+
     // ---- Fetch ports & status on mount ----
     const refreshStatus = useCallback(async () => {
+        // When using BLE, derive status from the BLE module
+        if (source === 'ble') {
+            const ble = getBleStatus();
+            setBleStatus(ble);
+            setStatus({
+                connected: ble.connected,
+                port: ble.port ?? 'BLE',
+                recording: ble.recording,
+                recording_samples: ble.recording_samples,
+            });
+            return;
+        }
         try {
             const [portsData, statusData] = await Promise.all([
                 getSerialPorts(),
@@ -69,7 +108,7 @@ export default function LiveDataPage() {
         } catch {
             // Backend may be unreachable
         }
-    }, [selectedPort]);
+    }, [selectedPort, source]);
 
     const refreshSessions = useCallback(async () => {
         try {
@@ -97,17 +136,21 @@ export default function LiveDataPage() {
 
     // Periodically update recording sample count
     useEffect(() => {
-        if (!status?.recording) return;
+        if (!recording) return;
         const interval = setInterval(async () => {
             try {
-                const s = await getSerialStatus();
-                setRecordingSamples(s.recording_samples);
+                if (source === 'ble') {
+                    setRecordingSamples(getBleStatus().recording_samples);
+                } else {
+                    const s = await getSerialStatus();
+                    setRecordingSamples(s.recording_samples);
+                }
             } catch {
                 // ignore
             }
         }, 1000);
         return () => clearInterval(interval);
-    }, [status?.recording]);
+    }, [recording, source]);
 
     // ---- Actions ----
     const handleConnect = async () => {
@@ -115,12 +158,18 @@ export default function LiveDataPage() {
         setError(null);
         setSuccess(null);
         try {
-            const res = await connectSerial(selectedPort || undefined);
-            if (res.status === 'connected' || res.status === 'already_connected') {
-                setSuccess(`Connected to ${res.port}`);
+            if (source === 'ble') {
+                const res = await connectBle();
+                setSuccess(`Connected via Bluetooth to ${res.port ?? 'BLE device'}`);
                 setSampleCount(0);
             } else {
-                setError(res.detail || 'Connection failed');
+                const res = await connectSerial(selectedPort || undefined);
+                if (res.status === 'connected' || res.status === 'already_connected') {
+                    setSuccess(`Connected to ${res.port}`);
+                    setSampleCount(0);
+                } else {
+                    setError(res.detail || 'Connection failed');
+                }
             }
             await refreshStatus();
         } catch (e) {
@@ -135,7 +184,11 @@ export default function LiveDataPage() {
         setError(null);
         setSuccess(null);
         try {
-            await disconnectSerial();
+            if (source === 'ble') {
+                await disconnectBle();
+            } else {
+                await disconnectSerial();
+            }
             setSuccess('Disconnected');
             setSampleCount(0);
             setLatestPoint(null);
@@ -150,7 +203,11 @@ export default function LiveDataPage() {
     const handleStartRecording = async () => {
         setError(null);
         try {
-            await startRecording();
+            if (source === 'ble') {
+                startBleRecording();
+            } else {
+                await startRecording();
+            }
             setRecordingSamples(0);
             await refreshStatus();
         } catch (e) {
@@ -162,15 +219,23 @@ export default function LiveDataPage() {
         setError(null);
         try {
             const sessionId = saveSessionId ? parseInt(saveSessionId, 10) : undefined;
-            const res = await stopRecording(sessionId);
-            if (res.status === 'recording_stopped') {
+            if (source === 'ble') {
+                const res = await stopBleRecording(sessionId);
                 const msg = res.saved_to_session
-                    ? `Recorded ${res.sample_count} samples (${res.duration_seconds}s) — saved to session #${res.saved_to_session}`
-                    : `Recorded ${res.sample_count} samples (${res.duration_seconds}s)`;
+                    ? `Recorded ${res.sample_count} samples (${res.duration_seconds.toFixed(1)}s) — saved to session #${res.saved_to_session}`
+                    : `Recorded ${res.sample_count} samples (${res.duration_seconds.toFixed(1)}s)`;
                 setSuccess(msg);
-                if (res.save_error) setError(res.save_error);
             } else {
-                setError(res.detail || 'Failed to stop recording');
+                const res = await stopRecording(sessionId);
+                if (res.status === 'recording_stopped') {
+                    const msg = res.saved_to_session
+                        ? `Recorded ${res.sample_count} samples (${res.duration_seconds}s) — saved to session #${res.saved_to_session}`
+                        : `Recorded ${res.sample_count} samples (${res.duration_seconds}s)`;
+                    setSuccess(msg);
+                    if (res.save_error) setError(res.save_error);
+                } else {
+                    setError(res.detail || 'Failed to stop recording');
+                }
             }
             await refreshStatus();
         } catch (e) {
@@ -189,8 +254,6 @@ export default function LiveDataPage() {
     };
 
     // ---- Render helpers ----
-    const connected = status?.connected ?? false;
-    const recording = status?.recording ?? false;
 
     const portOptions = ports.map((p) => ({
         value: p.device,
@@ -210,7 +273,7 @@ export default function LiveDataPage() {
                     <Box>
                         <Title order={2}>Live Sensor Data</Title>
                         <Text c="dimmed" size="sm">
-                            Connect to the Arduino, view real-time accelerometer data, and record sessions.
+                            Connect to the Arduino via USB or Bluetooth, view real-time data, and record sessions.
                         </Text>
                     </Box>
                     <Badge
@@ -225,7 +288,9 @@ export default function LiveDataPage() {
                             )
                         }
                     >
-                        {connected ? `Connected (${status?.port})` : 'Disconnected'}
+                        {connected
+                            ? `${source === 'ble' ? 'BLE' : 'USB'}: ${source === 'ble' ? (bleStatus.port ?? 'BLE') : status?.port}`
+                            : 'Disconnected'}
                     </Badge>
                 </Group>
 
@@ -255,37 +320,74 @@ export default function LiveDataPage() {
                     <Stack gap="md">
                         <Title order={4}>Connection</Title>
 
-                        <Group gap="sm" align="flex-end">
-                            <Select
-                                label="Serial Port"
-                                placeholder="Select port or auto-detect"
-                                data={portOptions}
-                                value={selectedPort}
-                                onChange={setSelectedPort}
-                                clearable
-                                style={{ flex: 1 }}
-                                disabled={connected}
-                            />
+                        {/* Source toggle */}
+                        <Group gap="sm">
                             <Button
-                                variant="subtle"
-                                size="sm"
-                                onClick={handleRefreshPorts}
+                                variant={source === 'usb' ? 'filled' : 'light'}
+                                color="green"
+                                leftSection={<IconUsb size={16} />}
+                                onClick={() => setSource('usb')}
                                 disabled={connected}
-                                leftSection={<IconRefresh size={16} />}
                             >
-                                Refresh
+                                USB Serial
+                            </Button>
+                            <Button
+                                variant={source === 'ble' ? 'filled' : 'light'}
+                                color="blue"
+                                leftSection={<IconBluetooth size={16} />}
+                                onClick={() => setSource('ble')}
+                                disabled={connected || !bleSupported}
+                            >
+                                Bluetooth
                             </Button>
                         </Group>
+
+                        {/* USB port selector */}
+                        {source === 'usb' && (
+                            <Group gap="sm" align="flex-end">
+                                <Select
+                                    label="Serial Port"
+                                    placeholder="Select port or auto-detect"
+                                    data={portOptions}
+                                    value={selectedPort}
+                                    onChange={setSelectedPort}
+                                    clearable
+                                    style={{ flex: 1 }}
+                                    disabled={connected}
+                                />
+                                <Button
+                                    variant="subtle"
+                                    size="sm"
+                                    onClick={handleRefreshPorts}
+                                    disabled={connected}
+                                    leftSection={<IconRefresh size={16} />}
+                                >
+                                    Refresh
+                                </Button>
+                            </Group>
+                        )}
+
+                        {/* BLE info */}
+                        {source === 'ble' && !connected && (
+                            <Text size="sm" c="dimmed">
+                                Click Connect to scan for your Bluetooth sensor.
+                                Make sure it's powered on and in range.
+                            </Text>
+                        )}
 
                         <Group gap="sm">
                             {!connected ? (
                                 <Button
                                     onClick={handleConnect}
                                     loading={loading}
-                                    leftSection={<IconPlugConnected size={16} />}
-                                    color="green"
+                                    leftSection={
+                                        source === 'ble'
+                                            ? <IconBluetooth size={16} />
+                                            : <IconPlugConnected size={16} />
+                                    }
+                                    color={source === 'ble' ? 'blue' : 'green'}
                                 >
-                                    Connect
+                                    Connect{source === 'ble' ? ' Bluetooth' : ''}
                                 </Button>
                             ) : (
                                 <Button
@@ -401,9 +503,11 @@ export default function LiveDataPage() {
                 {!connected && (
                     <Alert color="blue" variant="light">
                         <Text size="sm">
-                            <strong>Getting started:</strong> Plug the Arduino into this computer
-                            via USB, select the serial port above (or leave blank to auto-detect),
-                            then click <em>Connect</em>. Live data will stream automatically once connected.
+                            <strong>Getting started:</strong>{' '}
+                            {source === 'ble'
+                                ? 'Make sure your Bluetooth sensor is powered on and in range, then click Connect Bluetooth. The browser will prompt you to pair with the device.'
+                                : 'Plug the Arduino into this computer via USB, select the serial port above (or leave blank to auto-detect), then click Connect.'}{' '}
+                            Live data will stream automatically once connected.
                         </Text>
                     </Alert>
                 )}

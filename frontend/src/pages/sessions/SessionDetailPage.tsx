@@ -17,7 +17,6 @@ import {
     createSet,
     deleteSet,
     updateSet,
-    deleteGraphImage,
     analyzeAccelerometerData,
     type Session,
     type WorkoutSet,
@@ -41,7 +40,7 @@ import SessionHeader from '../../components/sessions/SessionHeader';
 import SessionInfoCard from '../../components/sessions/SessionInfoCard';
 import ActiveSetCard, { type SetComparison } from '../../components/sessions/ActiveSetCard';
 import SetDetailsCard from '../../components/sessions/SetDetailsCard';
-import GraphImagesCard from '../../components/sessions/GraphImagesCard';
+
 
 export default function SessionDetailPage() {
     const { sessionId } = useParams<{ sessionId: string }>();
@@ -480,11 +479,9 @@ export default function SessionDetailPage() {
                         lastSet={lastSet}
                         liveAz={liveAz}
                         actionLoading={actionLoading}
-                        analysisLoading={analysisLoading}
                         comparison={setComparison}
                         onToggleRecording={handleToggleRecording}
                         onCreateNewSet={handleCreateNewSet}
-                        onAnalyze={handleAnalyze}
                         onLiveData={handleLiveData}
                         onUpdateSet={handleUpdateSet}
                     />

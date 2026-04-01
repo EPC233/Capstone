@@ -5,7 +5,7 @@ import {
     useEffect,
     type ReactNode,
 } from 'react';
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, getAuthHeaders } from '../utils/api';
 import type { User } from '../types/api';
 
 interface AuthContextValue {
@@ -41,12 +41,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
 
         try {
-            const headers: Record<string, string> = {
-                Authorization: `Bearer ${token}`,
-            };
-
             const response = await fetch(`${API_URL}/auth/me`, {
-                headers,
+                headers: getAuthHeaders(false),
             });
 
             if (response.ok) {

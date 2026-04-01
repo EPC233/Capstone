@@ -8,14 +8,16 @@ import {
     Badge,
     Button,
     ThemeIcon,
+    Tooltip,
 } from '@mantine/core';
 import { IconUsb, IconBluetooth, IconPlugConnected, IconPlugConnectedX } from '@tabler/icons-react';
 import { useSerialStatus } from '../../contexts/SerialStatusContext';
 import { connectSerial, disconnectSerial } from '../../services/livedata';
-import { connectBle, disconnectBle } from '../../services/bluetooth';
+import { connectBle, disconnectBle, bluetoothUnsupportedReason } from '../../services/bluetooth';
 
 export default function SerialStatusCard() {
-    const { status, bleConnected, refreshStatus } = useSerialStatus();
+    const { status, bleConnected, bleSupported, refreshStatus } = useSerialStatus();
+    const bleUnsupportedReason = bleSupported ? null : bluetoothUnsupportedReason();
     const [loading, setLoading] = useState(false);
     const [bleLoading, setBleLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -109,16 +111,23 @@ export default function SerialStatusCard() {
                     >
                         {connectedViaUsb ? 'Disconnect' : 'USB'}
                     </Button>
-                    <Button
-                        variant={connectedViaBle ? 'light' : 'filled'}
-                        color={connectedViaBle ? 'red' : 'blue'}
-                        leftSection={<IconBluetooth size={16} />}
-                        onClick={handleToggleBle}
-                        loading={bleLoading}
-                        disabled={status.recording || connectedViaUsb}
+                    <Tooltip
+                        label={bleUnsupportedReason}
+                        disabled={bleSupported}
+                        multiline
+                        w={250}
                     >
-                        {connectedViaBle ? 'Disconnect' : 'Bluetooth'}
-                    </Button>
+                        <Button
+                            variant={connectedViaBle ? 'light' : 'filled'}
+                            color={connectedViaBle ? 'red' : 'blue'}
+                            leftSection={<IconBluetooth size={16} />}
+                            onClick={handleToggleBle}
+                            loading={bleLoading}
+                            disabled={!bleSupported || status.recording || connectedViaUsb}
+                        >
+                            {connectedViaBle ? 'Disconnect' : 'Bluetooth'}
+                        </Button>
+                    </Tooltip>
                 </Group>
             </Stack>
         </Card>

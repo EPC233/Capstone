@@ -18,18 +18,14 @@ import {
     IconPlayerRecord,
     IconPlayerStop,
     IconPlus,
-    IconChartLine,
-    IconDownload,
     IconEdit,
     IconCheck,
     IconX,
 } from '@tabler/icons-react';
-import type { WorkoutSet } from '../../services/sessions';
-import type { UpdateSetData } from '../../services/sessions';
-import type { SerialStatus } from '../../services/livedata';
-import type { AccelDataPoint } from '../../services/livedata';
+import type { WorkoutSet, UpdateSetData } from '../../services/sessions';
+import type { SerialStatus, AccelDataPoint } from '../../services/livedata';
 import LiveAccelChart from './LiveAccelChart';
-import { formatDate, formatFileSize, getDownloadUrl } from './sessionUtils';
+import { formatDate, formatFileSize } from './sessionUtils';
 
 export interface SetComparison {
     hoveredSetName: string;
@@ -45,11 +41,9 @@ interface ActiveSetCardProps {
     lastSet: WorkoutSet | null;
     liveAz: number | null;
     actionLoading: string | null;
-    analysisLoading: Record<number, boolean>;
     comparison: SetComparison | null;
     onToggleRecording: () => void;
     onCreateNewSet: () => void;
-    onAnalyze: (dataId: number) => void;
     onLiveData: (point: AccelDataPoint) => void;
     onUpdateSet?: (setId: number, data: UpdateSetData) => Promise<void>;
 }
@@ -72,11 +66,9 @@ export default function ActiveSetCard({
     lastSet,
     liveAz,
     actionLoading,
-    analysisLoading,
     comparison,
     onToggleRecording,
     onCreateNewSet,
-    onAnalyze,
     onLiveData,
     onUpdateSet,
 }: ActiveSetCardProps) {

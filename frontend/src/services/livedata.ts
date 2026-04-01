@@ -3,7 +3,7 @@
  * and provides a WebSocket wrapper for live accelerometer streaming.
  */
 
-import { getApiUrl } from '../utils/api';
+import { getApiUrl, getAuthHeaders, handleResponse } from '../utils/api';
 
 // ---- Types ----------------------------------------------------------------
 
@@ -54,30 +54,6 @@ export interface AccelDataPoint {
     az_world: number;
     index: number;
     timestamp: number;
-}
-
-// ---- Helpers --------------------------------------------------------------
-
-function getAuthHeaders(includeContentType = true): Record<string, string> {
-    const token = localStorage.getItem('auth_token');
-    return {
-        ...(includeContentType && { 'Content-Type': 'application/json' }),
-        ...(token && { Authorization: `Bearer ${token}` }),
-    };
-}
-
-async function handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-        let errorMessage = `Server error: ${response.status}`;
-        try {
-            const errorData = (await response.json()) as { detail?: string };
-            errorMessage = errorData.detail || errorMessage;
-        } catch {
-            // ignore
-        }
-        throw new Error(errorMessage);
-    }
-    return response.json() as Promise<T>;
 }
 
 // ---- REST API calls -------------------------------------------------------
