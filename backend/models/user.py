@@ -1,3 +1,7 @@
+"""
+User model — represents a user in the system.
+"""
+
 from sqlalchemy import (
     Boolean,
     Column,

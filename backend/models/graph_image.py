@@ -1,3 +1,7 @@
+"""
+GraphImage model — represents a graph image associated with a session.
+"""
+
 from datetime import datetime
 
 from sqlalchemy import (
@@ -20,6 +24,9 @@ class GraphImage(Base):
     session_id = Column(
         Integer, ForeignKey("sessions.id"), nullable=False, index=True
     )
+    set_id = Column(
+        Integer, ForeignKey("sets.id", ondelete="CASCADE"), nullable=True, index=True
+    )
     file_name = Column(String(255), nullable=False)
     file_path = Column(String(500), nullable=False)
     file_size = Column(Integer, nullable=True)
@@ -27,5 +34,6 @@ class GraphImage(Base):
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 
-    # Relationship
+    # Relationships
     session = relationship("Session", back_populates="graph_images")
+    set = relationship("Set", back_populates="graph_images")

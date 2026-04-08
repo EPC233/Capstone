@@ -27,6 +27,7 @@ from schemas.session import (
 )
 from schemas.set import SetCreate, SetUpdate, SetResponse
 from services.analysis_service import analyze_csv
+from services.chart_service import generate_chart_image
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -40,6 +41,7 @@ def _session_query_options():
     return [
         joinedload(Session.sets).joinedload(Set.accelerometer_data),
         joinedload(Session.sets).joinedload(Set.rep_details),
+        joinedload(Session.sets).joinedload(Set.graph_images),
         joinedload(Session.graph_images),
     ]
 
@@ -430,7 +432,40 @@ async def analyze_accelerometer_data(
         )
         db.add(new_rd)
 
+    # Generate and save chart image
+    chart_file_name = f"chart_{data.set_id}_{datetime.utcnow().timestamp()}.png"
+    chart_file_path = os.path.join(UPLOAD_DIR, chart_file_name)
+    generate_chart_image(analysis, chart_file_path)
+    chart_size = os.path.getsize(chart_file_path)
+
+    # Remove any existing chart images for this set
+    existing_charts = (await db.execute(
+        select(GraphImage).where(GraphImage.set_id == set_id)
+    )).scalars().all()
+    for old_chart in existing_charts:
+        if os.path.exists(old_chart.file_path):
+            os.remove(old_chart.file_path)
+        await db.delete(old_chart)
+
+    # Fetch the session_id from the set
+    set_result = await db.execute(select(Set).where(Set.id == set_id))
+    parent_set = set_result.scalars().first()
+
+    graph_image = GraphImage(
+        session_id=parent_set.session_id,
+        set_id=set_id,
+        file_name=chart_file_name,
+        file_path=chart_file_path,
+        file_size=chart_size,
+        image_type="png",
+        description="Auto-generated analysis chart",
+    )
+    db.add(graph_image)
+
     await db.commit()
+
+    # Include the chart image URL in the response
+    analysis["chart_image_url"] = f"/uploads/{chart_file_name}"
 
     return analysis
 

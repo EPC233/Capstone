@@ -22,6 +22,7 @@ export interface WorkoutSet {
     status: string; // "empty" | "recording" | "complete"
     accelerometer_data: AccelerometerData | null;
     rep_details: RepInfo[];
+    graph_images: GraphImage[];
     created_at: string;
     updated_at: string;
 }
@@ -256,6 +257,7 @@ export interface AnalysisResult {
     reps: RepInfo[];
     chart: AnalysisChart;
     rep_boundaries: { start: number; end: number }[];
+    chart_image_url?: string;
 }
 
 export async function analyzeAccelerometerData(

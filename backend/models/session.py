@@ -1,5 +1,5 @@
 """
-Session model for fitness tracking
+Session model — represents a workout session, which can contain multiple sets and associated graph images.
 """
 
 from datetime import datetime
@@ -38,6 +38,7 @@ class Session(Base):
         cascade="all, delete-orphan",
         order_by="Set.set_number",
     )
+    
     graph_images = relationship(
         "GraphImage", back_populates="session", cascade="all, delete-orphan"
     )

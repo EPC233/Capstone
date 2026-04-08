@@ -18,6 +18,7 @@ class GraphImageBase(BaseModel):
 class GraphImageResponse(GraphImageBase):
     id: int
     session_id: int
+    set_id: Optional[int] = None
     file_name: str
     file_path: str
     file_size: Optional[int] = None

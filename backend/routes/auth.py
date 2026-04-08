@@ -35,15 +35,19 @@ from services.email_service import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
+"""
+Endpoints for user registration, login, profile management, and password reset.
+"""
 
+""" 
+Registration endpoint for creating a new user account. Checks input and for existing username/email. 
+Yells at user accordingly.
+"""
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Register a new user.
-    """
     username = user_data.username.strip()
     email = user_data.email.strip()
     password = user_data.password.strip()

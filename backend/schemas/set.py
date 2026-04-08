@@ -121,6 +121,23 @@ class RepDetailResponse(BaseModel):
         )
 
 
+class GraphImageInSet(BaseModel):
+    """Graph image nested inside a Set response."""
+
+    id: int
+    session_id: int
+    set_id: Optional[int] = None
+    file_name: str
+    file_path: str
+    file_size: Optional[int] = None
+    image_type: Optional[str] = None
+    description: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
 class SetResponse(BaseModel):
     id: int
     session_id: int
@@ -131,6 +148,7 @@ class SetResponse(BaseModel):
     status: str
     accelerometer_data: Optional[AccelerometerDataInSet] = None
     rep_details: List[RepDetailResponse] = []
+    graph_images: List[GraphImageInSet] = []
     created_at: datetime
     updated_at: datetime
 

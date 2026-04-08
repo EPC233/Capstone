@@ -51,3 +51,8 @@ class Set(Base):
         cascade="all, delete-orphan",
         order_by="RepDetail.rep_number",
     )
+    graph_images = relationship(
+        "GraphImage",
+        back_populates="set",
+        cascade="all, delete-orphan",
+    )
