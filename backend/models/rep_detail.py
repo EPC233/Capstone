@@ -58,5 +58,4 @@ class RepDetail(Base):
 
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 
-    # Relationships
     set = relationship("Set", back_populates="rep_details")

@@ -30,7 +30,6 @@ class Session(Base):
         TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
     )
 
-    # Relationships
     user = relationship("User", back_populates="sessions")
     sets = relationship(
         "Set",

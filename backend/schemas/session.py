@@ -1,5 +1,16 @@
 """
-Session Pydantic schemas for request/response validation
+Schemas for session-related data stuffs.
+
+Schemas:
+    ---- Graph image schemas ----
+    GraphImageBase - Base graph image fields
+    GraphImageResponse - Graph image response
+
+    ---- Session schemas ----
+    SessionBase - Base session fields
+    SessionCreate - Create a new session
+    SessionUpdate - Update a session
+    SessionResponse - Full session response including sets and graph images
 """
 
 from datetime import datetime
@@ -10,7 +21,6 @@ from pydantic import BaseModel, Field
 from .set import SetResponse
 
 
-# Graph Image Schemas
 class GraphImageBase(BaseModel):
     description: Optional[str] = None
 
@@ -29,7 +39,6 @@ class GraphImageResponse(GraphImageBase):
         from_attributes = True
 
 
-# Session Schemas
 class SessionBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=200)
     description: Optional[str] = None

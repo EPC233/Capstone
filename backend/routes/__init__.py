@@ -1,4 +1,3 @@
-# Routes will be imported here
 from . import (
     auth,
     sessions,

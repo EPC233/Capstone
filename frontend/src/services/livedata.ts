@@ -132,8 +132,11 @@ export async function stopRecording(
  *  - `onData(cb)` — register a callback for each data point
  *  - `close()` — close the connection
  */
+export type ControlEvent = 'record_start' | 'record_stop' | 'tare';
+
 export function createLiveDataSocket(): {
     onData: (cb: (point: AccelDataPoint) => void) => void;
+    onControl: (cb: (event: ControlEvent) => void) => void;
     onClose: (cb: () => void) => void;
     onError: (cb: (err: Event) => void) => void;
     close: () => void;
@@ -146,17 +149,22 @@ export function createLiveDataSocket(): {
 
     const ws = new WebSocket(url);
     let dataCb: ((p: AccelDataPoint) => void) | null = null;
+    let controlCb: ((e: ControlEvent) => void) | null = null;
     let closeCb: (() => void) | null = null;
     let errorCb: ((e: Event) => void) | null = null;
 
     ws.onmessage = (event) => {
-        if (dataCb) {
-            try {
-                const point = JSON.parse(event.data as string) as AccelDataPoint;
-                dataCb(point);
-            } catch {
-                // ignore parse errors
+        try {
+            const msg = JSON.parse(event.data as string);
+            if (msg.type === 'control' && controlCb) {
+                controlCb(msg.event as ControlEvent);
+                return;
             }
+            if (dataCb) {
+                dataCb(msg as AccelDataPoint);
+            }
+        } catch {
+            // ignore parse errors
         }
     };
 
@@ -171,6 +179,9 @@ export function createLiveDataSocket(): {
     return {
         onData: (cb) => {
             dataCb = cb;
+        },
+        onControl: (cb) => {
+            controlCb = cb;
         },
         onClose: (cb) => {
             closeCb = cb;

@@ -36,6 +36,10 @@ type StatusCallback = () => void;
 const dataListeners: Set<DataCallback> = new Set();
 const statusListeners: Set<StatusCallback> = new Set();
 
+// Remote recording toggle (from device button)
+type RemoteToggleCallback = (isRecording: boolean) => void;
+const remoteToggleListeners: Set<RemoteToggleCallback> = new Set();
+
 function notifyStatus() {
     statusListeners.forEach((cb) => cb());
 }
@@ -104,7 +108,29 @@ function parsePacket(buffer: DataView): AccelDataPoint {
 function handleNotification(event: Event) {
     const target = event.target as BluetoothRemoteGATTCharacteristic;
     const value = target.value;
-    if (!value || value.byteLength < PACKET_SIZE) return;
+    if (!value) return;
+
+    // 1-byte packet = recording toggle marker from device button
+    if (value.byteLength === 1) {
+        const shouldRecord = value.getUint8(0) !== 0;
+
+        if (shouldRecord && !recording) {
+            csvLines = [];
+            recordingSamples = 0;
+            recordingStartTime = Date.now();
+            recording = true;
+            notifyStatus();
+        } else if (!shouldRecord && recording) {
+            recording = false;
+            notifyStatus();
+        }
+
+        remoteToggleListeners.forEach((cb) => cb(shouldRecord));
+        return;
+    }
+
+    // 56-byte packet = IMU data
+    if (value.byteLength < PACKET_SIZE) return;
 
     const point = parsePacket(new DataView(value.buffer, value.byteOffset, value.byteLength));
     dataListeners.forEach((cb) => cb(point));
@@ -184,7 +210,7 @@ export async function connectBle(): Promise<{ status: string; port?: string }> {
     const service = await server.getPrimaryService(IMU_SERVICE_UUID);
     characteristic = await service.getCharacteristic(IMU_CHARACTERISTIC_UUID);
 
-    // Subscribe to notifications
+    // Subscribe to IMU data notifications
     await characteristic.startNotifications();
     characteristic.addEventListener(
         'characteristicvaluechanged',
@@ -301,4 +327,14 @@ export function onBleData(cb: DataCallback): () => void {
 export function onBleStatusChange(cb: StatusCallback): () => void {
     statusListeners.add(cb);
     return () => statusListeners.delete(cb);
+}
+
+/**
+ * Register a callback for remote recording toggles (device button).
+ * The callback receives `true` when recording starts, `false` when it stops.
+ * Returns an unsubscribe function.
+ */
+export function onBleRemoteToggle(cb: RemoteToggleCallback): () => void {
+    remoteToggleListeners.add(cb);
+    return () => remoteToggleListeners.delete(cb);
 }

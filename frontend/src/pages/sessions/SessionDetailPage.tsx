@@ -30,6 +30,7 @@ import {
     startRecording,
     stopRecording,
     type AccelDataPoint,
+    type ControlEvent,
 } from '../../services/livedata';
 import {
     isBleConnected,
@@ -261,6 +262,42 @@ export default function SessionDetailPage() {
     useEffect(() => {
         loadSession();
     }, [loadSession]);
+
+    // Handle control events from the device button (via LiveAccelChart)
+    const handleControl = useCallback(async (event: ControlEvent) => {
+        if (!session) return;
+        if (event === 'record_stop' && serialStatus.recording) {
+            try {
+                setActionLoading('record');
+                setError(null);
+                if (isBleConnected()) {
+                    await stopBleRecording(session.id, recordingSetId ?? undefined);
+                } else {
+                    await stopRecording(session.id, recordingSetId ?? undefined);
+                }
+                setRecordingSetId(null);
+                await loadSession();
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Recording failed');
+            } finally {
+                setActionLoading(null);
+            }
+        } else if (event === 'record_start' && !serialStatus.recording) {
+            try {
+                setActionLoading('record');
+                setError(null);
+                if (isBleConnected()) {
+                    startBleRecording();
+                } else {
+                    await startRecording();
+                }
+            } catch (err) {
+                setError(err instanceof Error ? err.message : 'Recording failed');
+            } finally {
+                setActionLoading(null);
+            }
+        }
+    }, [session, recordingSetId, serialStatus.recording, loadSession]);
 
     // Start editing
     function startEditing() {
@@ -494,6 +531,7 @@ export default function SessionDetailPage() {
                         onToggleRecording={handleToggleRecording}
                         onCreateNewSet={handleCreateNewSet}
                         onLiveData={handleLiveData}
+                        onControl={handleControl}
                         onUpdateSet={handleUpdateSet}
                     />
 

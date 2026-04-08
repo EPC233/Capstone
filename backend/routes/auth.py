@@ -1,5 +1,14 @@
 """
-Authentication API endpoints
+Routes for user management stuff - mostly deprecated but still good to have ig.
+
+Routes:
+    POST /auth/register - Register a new account
+    POST /auth/login - Authenticate user and return token
+    GET /auth/me - Retrieve current user profile
+    PATCH /auth/me/profile - Update current user profile
+    POST /auth/forgot-password - Request password reset token via email
+    POST /auth/reset-password - Reset password using valid reset token
+    GET /auth/users/search - Search for users by username
 """
 
 from datetime import timedelta
@@ -35,14 +44,6 @@ from services.email_service import send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-"""
-Endpoints for user registration, login, profile management, and password reset.
-"""
-
-""" 
-Registration endpoint for creating a new user account. Checks input and for existing username/email. 
-Yells at user accordingly.
-"""
 @router.post("/register", response_model=UserResponse, status_code=201)
 async def register(
     user_data: UserCreate,
@@ -102,9 +103,6 @@ async def register(
 
 @router.post("/login", response_model=Token)
 async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
-    """
-    Login endpoint that returns a JWT token.
-    """
     user = await authenticate_user(login_data.username, login_data.password, db)
     if not user:
         raise HTTPException(
@@ -129,9 +127,6 @@ async def login(login_data: UserLogin, db: AsyncSession = Depends(get_db)):
 async def get_current_user_info(
     current_user: User = Depends(get_current_active_user),
 ):
-    """
-    Get the current authenticated user's information.
-    """
     return current_user
 
 
@@ -145,9 +140,6 @@ async def update_my_profile(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Update the current user's profile fields.
-    """
     if profile_data.first_name is not None:
         current_user.first_name = (
             profile_data.first_name.strip() if profile_data.first_name else None
@@ -170,10 +162,6 @@ async def forgot_password(
     data: PasswordResetRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Request a password reset email.
-    Always returns 200 to avoid leaking whether the email exists.
-    """
     email = data.email.strip().lower()
     user = await get_user_by_email(email, db)
     if user:
@@ -187,9 +175,6 @@ async def reset_password(
     data: PasswordResetForm,
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Reset password using a valid token.
-    """
     payload = verify_password_reset_token(data.token)
     if not payload:
         raise HTTPException(
@@ -234,11 +219,6 @@ async def search_users(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Search for users by username.
-    Returns users whose username contains the search query.
-    Excludes the current user from results.
-    """
     if not q or len(q) < 2:
         return []
     

@@ -34,6 +34,5 @@ class GraphImage(Base):
     description = Column(Text, nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
 
-    # Relationships
     session = relationship("Session", back_populates="graph_images")
     set = relationship("Set", back_populates="graph_images")

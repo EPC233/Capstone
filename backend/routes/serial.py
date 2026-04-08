@@ -1,14 +1,18 @@
 """
-Serial / live-data API routes.
+Serial port routes for Arduino and data mangement.
 
-Provides:
-  - GET  /serial/ports          — list available serial ports
-  - POST /serial/connect        — connect to the Arduino
-  - POST /serial/disconnect     — disconnect
-  - GET  /serial/status         — connection & recording status
-  - POST /serial/record/start   — begin recording data
-  - POST /serial/record/stop    — stop recording, return CSV + save to session
-  - WS   /serial/ws             — WebSocket stream of live accelerometer data
+Routes:
+    ---- Serial connection routes ----
+    GET /serial/ports - List serial ports
+    GET /serial/status - Get current connection and recording status
+    POST /serial/connect - Connect to Arduino
+    POST /serial/disconnect - Disconnect from Arduino
+    
+    ---- Serial recording routes ----
+    POST /serial/record/start - Start recording serial data
+    POST /serial/record/stop - Stop recording (if session_id save to session, set_id to overwrite specific set)
+    POST /serial/record/upload - Upload csv to session - deprecated as of now
+    WebSocket /serial/ws - Stream live serial data
 """
 
 import os
@@ -37,7 +41,6 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 async def get_ports(
     current_user: User = Depends(get_current_active_user),
 ):
-    """List available serial ports."""
     return list_serial_ports()
 
 
@@ -45,7 +48,6 @@ async def get_ports(
 async def get_status(
     current_user: User = Depends(get_current_active_user),
 ):
-    """Get current connection and recording status."""
     return {
         "connected": serial_service.is_connected,
         "port": serial_service.port,
@@ -60,7 +62,6 @@ async def connect(
     baud: int = Query(115200, description="Baud rate"),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Connect to the Arduino serial port."""
     result = await serial_service.connect(port=port, baud=baud)
     return result
 
@@ -69,7 +70,6 @@ async def connect(
 async def disconnect(
     current_user: User = Depends(get_current_active_user),
 ):
-    """Disconnect from the Arduino."""
     result = await serial_service.disconnect()
     return result
 
@@ -78,7 +78,6 @@ async def disconnect(
 async def start_recording(
     current_user: User = Depends(get_current_active_user),
 ):
-    """Start recording accelerometer data."""
     result = await serial_service.start_recording()
     return result
 
@@ -90,11 +89,6 @@ async def stop_recording(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Stop recording and optionally save the CSV to a session.
-    If session_id is provided, the CSV is saved as accelerometer data on that session.
-    If set_id is also provided, the recording overwrites that specific set's data.
-    """
     result = await serial_service.stop_recording()
 
     if result.get("status") != "recording_stopped":
@@ -171,6 +165,7 @@ async def stop_recording(
                 file_size=len(csv_content.encode()),
                 description=f"Set {new_set.set_number} — {result.get('sample_count', 0)} samples, {result.get('duration_seconds', 0)}s",
             )
+            
             db.add(accel_data)
             new_set.status = "complete"
             new_set.updated_at = datetime.utcnow()
@@ -193,10 +188,6 @@ async def upload_recording(
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Accept a CSV body recorded client-side (e.g. via BLE) and save it to a session.
-    Reuses the same save logic as /record/stop.
-    """
     csv_content = (await request.body()).decode("utf-8")
     if not csv_content.strip():
         return {"error": "Empty CSV body"}
@@ -288,15 +279,6 @@ async def upload_recording(
 
 @router.websocket("/ws")
 async def websocket_live_data(websocket: WebSocket):
-    """
-    Stream live accelerometer data to the client.
-
-    The client should send a valid auth token as a query parameter:
-        ws://host/api/serial/ws?token=<jwt>
-
-    Each message is a JSON object with the 13 accelerometer columns
-    plus ``index`` and ``timestamp``.
-    """
     await websocket.accept()
 
     queue = serial_service.subscribe()

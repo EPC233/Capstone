@@ -214,6 +214,19 @@ class SerialService:
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         self._subscribers.discard(queue)
 
+    def _broadcast_control(self, event: str) -> None:
+        """Send a control event (e.g. record_start, record_stop) to all WS subscribers."""
+        message = json.dumps({"type": "control", "event": event})
+        for queue in self._subscribers:
+            try:
+                queue.put_nowait(message)
+            except asyncio.QueueFull:
+                try:
+                    queue.get_nowait()
+                    queue.put_nowait(message)
+                except asyncio.QueueEmpty:
+                    pass
+
     async def _skip_header(self) -> None:
         """Read and discard lines until we get valid numeric data."""
         if not self._serial:
@@ -245,6 +258,22 @@ class SerialService:
 
                 line = raw.decode(errors="replace").strip()
                 parts = line.split(",")
+
+                # Detect button-triggered recording commands
+                if line == "RECORD_START":
+                    if not self._recording:
+                        self._recording_buffer = RecordingBuffer(start_time=time.time())
+                        self._recording = True
+                    self._broadcast_control("record_start")
+                    continue
+                if line == "RECORD_STOP":
+                    if self._recording:
+                        self._recording = False
+                    self._broadcast_control("record_stop")
+                    continue
+                if line == "TARE":
+                    self._broadcast_control("tare")
+                    continue
 
                 if len(parts) not in (EXPECTED_COLS_NO_TS, EXPECTED_COLS_WITH_TS):
                     continue

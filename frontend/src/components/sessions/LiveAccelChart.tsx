@@ -3,8 +3,9 @@ import { Paper } from '@mantine/core';
 import {
     createLiveDataSocket,
     type AccelDataPoint,
+    type ControlEvent,
 } from '../../services/livedata';
-import { isBleConnected, onBleData } from '../../services/bluetooth';
+import { isBleConnected, onBleData, onBleRemoteToggle } from '../../services/bluetooth';
 import { colorScheme, hexToRgba } from '../../colorScheme';
 
 const MAX_CHART_POINTS = 300;
@@ -13,21 +14,27 @@ export interface LiveAccelChartProps {
     active?: boolean;
     height?: number;
     onData?: (point: AccelDataPoint) => void;
+    onControl?: (event: ControlEvent) => void;
 }
 
 export default function LiveAccelChart({
     active = true,
     height = 200,
     onData,
+    onControl,
 }: LiveAccelChartProps) {
     const chartBuffer = useRef<AccelDataPoint[]>([]);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const animFrameRef = useRef<number>(0);
     const socketRef = useRef<ReturnType<typeof createLiveDataSocket> | null>(null);
     const onDataRef = useRef(onData);
+    const onControlRef = useRef(onControl);
     useEffect(() => {
         onDataRef.current = onData;
     }, [onData]);
+    useEffect(() => {
+        onControlRef.current = onControl;
+    }, [onControl]);
 
     useEffect(() => {
         if (!active) {
@@ -48,13 +55,19 @@ export default function LiveAccelChart({
 
         if (isBleConnected()) {
             const unsub = onBleData(pushPoint);
-            return () => { unsub(); };
+            const unsubToggle = onBleRemoteToggle((isRecording) => {
+                onControlRef.current?.(isRecording ? 'record_start' : 'record_stop');
+            });
+            return () => { unsub(); unsubToggle(); };
         }
 
         if (!socketRef.current) {
             const sock = createLiveDataSocket();
             socketRef.current = sock;
             sock.onData(pushPoint);
+            sock.onControl((evt) => {
+                onControlRef.current?.(evt);
+            });
             sock.onClose(() => {
                 socketRef.current = null;
             });

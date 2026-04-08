@@ -1,14 +1,23 @@
 """
-Set Pydantic schemas for request/response validation
+Schemas for set data and responses. Important file!
+
+Schemas:
+    ---- Request schemas ----
+    SetCreate - Create a new set
+    SetUpdate - Update a set
+
+    ---- Response schemas ----
+    AccelerometerDataInSet - The actual data file info nested inside a set response
+    PhaseDetail - Eccentric/concentric phase metrics for a rep
+    RepDetailResponse - Single rep with nested per-phase details
+    GraphImageInSet - Graph image nested inside a Set response
+    SetResponse - Full set response with all of the stuff above nested inside
 """
 
 from datetime import datetime
 from typing import Any, List, Optional
 
 from pydantic import BaseModel, model_validator
-
-
-# ---- Request schemas --------------------------------------------------------
 
 
 class SetCreate(BaseModel):
@@ -24,12 +33,7 @@ class SetUpdate(BaseModel):
     status: Optional[str] = None
 
 
-# ---- Response schemas -------------------------------------------------------
-
-
 class AccelerometerDataInSet(BaseModel):
-    """Accelerometer data nested inside a Set response."""
-
     id: int
     set_id: int
     file_name: str
@@ -52,7 +56,7 @@ class PhaseDetail(BaseModel):
     avg_accel: float
     avg_watts: Optional[float] = None
 
-
+""" Used in file session.py to avoid circular imports """
 class RepDetailResponse(BaseModel):
     id: int
     set_id: int
@@ -74,9 +78,13 @@ class RepDetailResponse(BaseModel):
     class Config:
         from_attributes = True
 
+    """ 
+    This converts the ORM model to the response model, including nested phase details.
+    Definitely makes things easier to work with I promise! Its alot of mapping, bit 
+    it keeps all of that bs in the same place and out of session.py - which is already a monster of a file.
+    """
     @classmethod
     def from_orm_model(cls, obj: "RepDetailResponse") -> "RepDetailResponse":
-        """Build from the flat ORM model, grouping ecc_/con_ columns into nested objects."""
         ecc = None
         if obj.ecc_start_sample is not None:
             ecc = PhaseDetail(
@@ -122,8 +130,6 @@ class RepDetailResponse(BaseModel):
 
 
 class GraphImageInSet(BaseModel):
-    """Graph image nested inside a Set response."""
-
     id: int
     session_id: int
     set_id: Optional[int] = None
@@ -158,8 +164,6 @@ class SetResponse(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def convert_rep_details(cls, data: Any) -> Any:
-        """Convert flat ORM RepDetail objects into nested RepDetailResponse."""
-        # When data comes from ORM (has attribute access)
         if hasattr(data, "rep_details"):
             raw = data.rep_details
             if raw and len(raw) > 0 and hasattr(raw[0], "ecc_start_sample"):

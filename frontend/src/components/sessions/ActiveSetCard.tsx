@@ -23,7 +23,7 @@ import {
     IconX,
 } from '@tabler/icons-react';
 import type { WorkoutSet, UpdateSetData } from '../../services/sessions';
-import type { SerialStatus, AccelDataPoint } from '../../services/livedata';
+import type { SerialStatus, AccelDataPoint, ControlEvent } from '../../services/livedata';
 import LiveAccelChart from './LiveAccelChart';
 import { formatDate, formatFileSize } from './sessionUtils';
 
@@ -45,6 +45,7 @@ interface ActiveSetCardProps {
     onToggleRecording: () => void;
     onCreateNewSet: () => void;
     onLiveData: (point: AccelDataPoint) => void;
+    onControl?: (event: ControlEvent) => void;
     onUpdateSet?: (setId: number, data: UpdateSetData) => Promise<void>;
 }
 
@@ -70,6 +71,7 @@ export default function ActiveSetCard({
     onToggleRecording,
     onCreateNewSet,
     onLiveData,
+    onControl,
     onUpdateSet,
 }: ActiveSetCardProps) {
     const [editing, setEditing] = useState(false);
@@ -154,6 +156,7 @@ export default function ActiveSetCard({
                             active={serialStatus.recording}
                             height={200}
                             onData={onLiveData}
+                            onControl={onControl}
                         />
                         <Group justify="space-between" px="xs">
                             <Text size="sm" c="dimmed">

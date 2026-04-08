@@ -1,12 +1,3 @@
-"""
-Accelerometer data analysis service.
-
-Ported from sensor/PlotDataMagwick.py — performs rep detection and
-motion analysis on gravity-corrected accelerometer CSV data.
-
-Returns structured JSON data suitable for client-side charting.
-"""
-
 import io
 from dataclasses import dataclass, field
 
@@ -25,7 +16,6 @@ EXPECTED_COLS = len(COLUMNS)
 
 @dataclass
 class PhaseInfo:
-    """Metrics for a single phase (concentric or eccentric) of a rep."""
     start_sample: int
     end_sample: int
     duration_seconds: float
@@ -38,7 +28,6 @@ class PhaseInfo:
 
 @dataclass
 class RepInfo:
-    """Info about a single detected rep."""
     rep_number: int
     start_sample: int
     end_sample: int
@@ -57,13 +46,11 @@ class RepInfo:
 
 @dataclass
 class AnalysisResult:
-    """Full analysis result for a CSV recording."""
     total_samples: int
     sample_rate: int
     duration_seconds: float
     rep_count: int
     reps: list[RepInfo]
-    # Downsampled time-series for charting (avoid sending 10k+ points)
     time_samples: list[int]
     z_accel: list[float]         # smoothed Z acceleration (g)
     velocity: list[float]        # Z velocity (m/s)

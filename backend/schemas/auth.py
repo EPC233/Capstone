@@ -1,11 +1,30 @@
+"""
+Schemas for user authentication and profile management. Kinda deprecated since this wont be going live, but
+allows for multiple users on the same instance which is cool.
+
+Schemas:
+    ---- User schemas ----
+    UserBase - Base schema for user data
+    UserCreate - Create/Register a new user
+    UserLogin - User login credentials
+    UserResponse - User data returned to the client
+    UserProfileUpdate - Update user profile fields
+
+    ---- Token schemas ----
+    Token - JWT token response
+    TokenData - Decoded token
+
+    ---- Password reset schemas ----
+    PasswordResetRequest - Request a password reset email
+    PasswordResetForm - Submit a new password with reset token
+"""
+
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserBase(BaseModel):
-    """Base schema with common user fields"""
-
     username: str
     email: EmailStr
     first_name: Optional[str] = None
@@ -14,21 +33,15 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Schema for creating a new user (registration)"""
-
     password: str
 
 
 class UserLogin(BaseModel):
-    """Schema for user login"""
-
     username: str
     password: str
 
 
 class UserResponse(UserBase):
-    """What a user looks like when we send it back to the client"""
-
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -36,35 +49,25 @@ class UserResponse(UserBase):
 
 
 class Token(BaseModel):
-    """Schema for JWT token response"""
-
     access_token: str
     token_type: str = "bearer"
 
 
 class TokenData(BaseModel):
-    """Schema for decoded token data"""
-
     username: Optional[str] = None
     user_id: Optional[int] = None
 
 
 class UserProfileUpdate(BaseModel):
-    """Schema for updating user profile fields"""
-
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     avatar_url: Optional[str] = None
 
 
 class PasswordResetRequest(BaseModel):
-    """Schema for requesting a password reset email"""
-
     email: EmailStr
 
 
 class PasswordResetForm(BaseModel):
-    """Schema for submitting password reset with token"""
-
     token: str
     new_password: str

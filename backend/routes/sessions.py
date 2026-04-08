@@ -1,5 +1,27 @@
 """
-Session API endpoints
+Session API endpoints for managing sessions, sets, and data analysis.
+
+Routes:
+    ---- Session management ----
+    POST / - Create a new session
+    GET / - Get all sessions for current user
+    GET /{session_id} - Get a specific session by ID
+    PUT /{session_id} - Update a session
+    DELETE /{session_id} - Delete a session
+    
+    ---- Set management ----
+    POST /{session_id}/sets - Create a new set within a session
+    PATCH /sets/{set_id} - Update a set's properties (name, description, weight, status)
+    DELETE /sets/{set_id} - Delete a set and its accelerometer data
+    
+    ---- Accelerometer data management and analysis ----
+    POST /sets/{set_id}/accelerometer - Upload accelerometer CSV data for a set
+    GET /accelerometer/{data_id}/analyze - Analyze accelerometer data and generate rep details
+    DELETE /accelerometer/{data_id} - Delete accelerometer data
+    
+    ---- Graph image management ----
+    POST /{session_id}/graph - Upload a graph/chart image to a session
+    DELETE /graph/{image_id} - Delete a graph image
 """
 
 import os
@@ -31,13 +53,11 @@ from services.chart_service import generate_chart_image
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
-# Upload directory for files
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def _session_query_options():
-    """Common joinedload options for session queries."""
     return [
         joinedload(Session.sets).joinedload(Set.accelerometer_data),
         joinedload(Session.sets).joinedload(Set.rep_details),
@@ -75,7 +95,6 @@ async def get_user_sessions(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Get all sessions for the current user."""
     result = await db.execute(
         select(Session)
         .where(Session.user_id == current_user.id)
@@ -143,7 +162,6 @@ async def delete_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete a session and all associated data."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
@@ -164,7 +182,6 @@ async def create_set(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Create a new empty set for a session."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
@@ -253,7 +270,6 @@ async def delete_set(
     if not s:
         raise HTTPException(status_code=404, detail="Set not found")
 
-    # Remove file from disk if present
     if s.accelerometer_data and os.path.exists(s.accelerometer_data.file_path):
         os.remove(s.accelerometer_data.file_path)
 
@@ -271,7 +287,6 @@ async def upload_accelerometer_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Upload accelerometer CSV data for a set."""
     result = await db.execute(
         select(Set)
         .join(Session)
@@ -335,7 +350,6 @@ async def analyze_accelerometer_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Analyse an accelerometer CSV file and return rep-detection results."""
     result = await db.execute(
         select(AccelerometerData)
         .join(Set)
@@ -350,7 +364,6 @@ async def analyze_accelerometer_data(
         raise HTTPException(status_code=404, detail="Accelerometer data not found")
     file_path = data.file_path
     if not os.path.exists(file_path):
-        # Stored path may be an absolute host path; try resolving via UPLOAD_DIR
         file_path = os.path.join(UPLOAD_DIR, os.path.basename(file_path))
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="CSV file not found on disk")
@@ -432,13 +445,11 @@ async def analyze_accelerometer_data(
         )
         db.add(new_rd)
 
-    # Generate and save chart image
     chart_file_name = f"chart_{data.set_id}_{datetime.utcnow().timestamp()}.png"
     chart_file_path = os.path.join(UPLOAD_DIR, chart_file_name)
     generate_chart_image(analysis, chart_file_path)
     chart_size = os.path.getsize(chart_file_path)
 
-    # Remove any existing chart images for this set
     existing_charts = (await db.execute(
         select(GraphImage).where(GraphImage.set_id == set_id)
     )).scalars().all()
@@ -447,7 +458,6 @@ async def analyze_accelerometer_data(
             os.remove(old_chart.file_path)
         await db.delete(old_chart)
 
-    # Fetch the session_id from the set
     set_result = await db.execute(select(Set).where(Set.id == set_id))
     parent_set = set_result.scalars().first()
 
@@ -464,7 +474,6 @@ async def analyze_accelerometer_data(
 
     await db.commit()
 
-    # Include the chart image URL in the response
     analysis["chart_image_url"] = f"/uploads/{chart_file_name}"
 
     return analysis
@@ -476,7 +485,6 @@ async def delete_accelerometer_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete accelerometer data file."""
     result = await db.execute(
         select(AccelerometerData)
         .join(Set)
@@ -490,7 +498,6 @@ async def delete_accelerometer_data(
     if not data:
         raise HTTPException(status_code=404, detail="Accelerometer data not found")
 
-    # Also mark the parent set back to empty
     set_result = await db.execute(
         select(Set).where(Set.id == data.set_id)
     )
@@ -515,7 +522,6 @@ async def upload_graph_image(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Upload a graph image for a session."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
@@ -560,7 +566,6 @@ async def delete_graph_image(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete graph image file."""
     result = await db.execute(
         select(GraphImage)
         .join(Session)

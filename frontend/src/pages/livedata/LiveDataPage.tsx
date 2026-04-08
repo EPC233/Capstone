@@ -35,6 +35,7 @@ import {
     type SerialPort,
     type SerialStatus,
     type AccelDataPoint,
+    type ControlEvent,
 } from '../../services/livedata';
 import {
     isBluetoothSupported,
@@ -109,6 +110,45 @@ export default function LiveDataPage() {
             // Backend may be unreachable
         }
     }, [selectedPort, source]);
+
+    // Handle control events from device button (via LiveAccelChart)
+    const handleControl = useCallback(async (event: ControlEvent) => {
+        if (event === 'record_start' && !recording) {
+            setError(null);
+            try {
+                if (source === 'ble') {
+                    startBleRecording();
+                } else {
+                    await startRecording();
+                }
+                setRecordingSamples(0);
+            } catch (e) {
+                setError(e instanceof Error ? e.message : 'Failed to start recording');
+            }
+        } else if (event === 'record_stop' && recording) {
+            setError(null);
+            try {
+                const sessionId = saveSessionId ? parseInt(saveSessionId, 10) : undefined;
+                if (source === 'ble') {
+                    const res = await stopBleRecording(sessionId);
+                    const msg = res.saved_to_session
+                        ? `Recorded ${res.sample_count} samples (${res.duration_seconds.toFixed(1)}s) — saved to session #${res.saved_to_session}`
+                        : `Recorded ${res.sample_count} samples (${res.duration_seconds.toFixed(1)}s)`;
+                    setSuccess(msg);
+                } else {
+                    const res = await stopRecording(sessionId);
+                    if (res.status === 'recording_stopped') {
+                        const msg = res.saved_to_session
+                            ? `Recorded ${res.sample_count} samples (${res.duration_seconds}s) — saved to session #${res.saved_to_session}`
+                            : `Recorded ${res.sample_count} samples (${res.duration_seconds}s)`;
+                        setSuccess(msg);
+                    }
+                }
+            } catch (e) {
+                setError(e instanceof Error ? e.message : 'Failed to stop recording');
+            }
+        }
+    }, [source, recording, saveSessionId]);
 
     const refreshSessions = useCallback(async () => {
         try {
@@ -466,6 +506,7 @@ export default function LiveDataPage() {
                             active={connected}
                             height={300}
                             onData={handleChartData}
+                            onControl={handleControl}
                         />
                     </Stack>
                 </Card>

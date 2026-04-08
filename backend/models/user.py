@@ -22,12 +22,10 @@ class User(Base):
     hashed_password = Column(String(255), nullable=False)
     email_verified = Column(Boolean, default=False, nullable=False, index=True)
 
-    # Optional fields
     first_name = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=True)
     avatar_url = Column(String(500), nullable=True)
 
-    # Relationships
     sessions = relationship(
         "Session", back_populates="user", cascade="all, delete-orphan"
     )

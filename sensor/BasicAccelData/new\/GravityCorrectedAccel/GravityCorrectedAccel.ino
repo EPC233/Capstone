@@ -9,6 +9,17 @@ float deltat = 0.0f;  // Refresh rate in seconds
 // Gravity
 const float G = 9.80665;
 
+// Button ________________________________________________________________________
+#define BUTTON_PIN 2
+bool isRecording = false;
+bool lastButtonState = HIGH;           // INPUT_PULLUP → idle HIGH
+unsigned long lastDebounceTime = 0;
+const unsigned long DEBOUNCE_MS = 50;
+
+// Tare (zero) reference quaternion — stores orientation at button press
+float refQw = 1.0f, refQx = 0.0f, refQy = 0.0f, refQz = 0.0f;
+bool needsTare = false;
+
 // Bluetooth _____________________________________________________________________
 #define IMU_SERVICE_UUID        "12345678-1234-5678-1234-56789abcdef0"
 #define IMU_CHARACTERISTIC_UUID "12345678-1234-5678-1234-56789abcdef1"
@@ -30,11 +41,15 @@ void setup() {
   unsigned long serialWait = millis();
   while (!Serial && (millis() - serialWait < 3000));
 
+  // Button & LED
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
   if (!IMU.begin()) {
     Serial.println("Failed to initialize IMU!");
     while (1);
   }
-
 
   // ── Initialize BLE ──────────────────────────────────────────
   if (!BLE.begin()) {
@@ -46,6 +61,7 @@ void setup() {
   BLE.setAdvertisedService(imuService);
   imuService.addCharacteristic(imuCharacteristic);
   BLE.addService(imuService);
+
   BLE.advertise();
 
   Serial.println("BLE advertising as \"IMU-Sensor\"");
@@ -56,6 +72,31 @@ void setup() {
 void loop() {
   // Keep BLE stack alive (handles connections, disconnections, etc.)
   BLE.poll();
+
+  // ── Button debounce & toggle ─────────────────────────────────
+  bool reading = digitalRead(BUTTON_PIN);
+  if (reading != lastButtonState) {
+    lastDebounceTime = millis();
+  }
+  if ((millis() - lastDebounceTime) > DEBOUNCE_MS) {
+    static bool stableState = HIGH;
+    if (reading != stableState) {
+      stableState = reading;
+      if (stableState == LOW) {  // Pressed (active LOW with pullup)
+        isRecording = !isRecording;
+        digitalWrite(LED_BUILTIN, isRecording ? HIGH : LOW);
+        // Tare orientation on the next IMU sample
+        needsTare = true;
+        // Send 1-byte marker over BLE so the web app knows
+        if (BLE.connected()) {
+          uint8_t marker = isRecording ? 1 : 0;
+          imuCharacteristic.writeValue(&marker, 1);
+        }
+        Serial.println(isRecording ? "RECORD_START" : "RECORD_STOP");
+      }
+    }
+  }
+  lastButtonState = reading;
 
   float ax, ay, az;
   float gx, gy, gz;
@@ -91,6 +132,24 @@ void loop() {
     float qx = sr * cp * cy - cr * sp * sy;
     float qy = cr * sp * cy + sr * cp * sy;
     float qz = cr * cp * sy - sr * sp * cy;
+
+    // Capture tare reference if requested (button was just pressed)
+    if (needsTare) {
+      // Store conjugate of current quaternion as reference
+      refQw =  qw;
+      refQx = -qx;
+      refQy = -qy;
+      refQz = -qz;
+      needsTare = false;
+      Serial.println("TARE");
+    }
+
+    // Apply tare: q_rel = q_ref_inv * q_current
+    float rw = refQw*qw - refQx*qx - refQy*qy - refQz*qz;
+    float rx = refQw*qx + refQx*qw + refQy*qz - refQz*qy;
+    float ry = refQw*qy - refQx*qz + refQy*qw + refQz*qx;
+    float rz = refQw*qz + refQx*qy - refQy*qx + refQz*qw;
+    qw = rw; qx = rx; qy = ry; qz = rz;
 
     // Rotate accel into world frame
     float ax_w = ax, ay_w = ay, az_w = az;

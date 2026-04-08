@@ -31,7 +31,7 @@ class Set(Base):
     weight_kg = Column(Float, nullable=True)
     status = Column(
         String(20), nullable=False, default="empty"
-    )  # empty | recording | complete
+    )
     created_at = Column(TIMESTAMP, default=datetime.utcnow, nullable=False)
     updated_at = Column(
         TIMESTAMP, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
