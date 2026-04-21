@@ -1,9 +1,5 @@
 """
-Chart image generation service.
-
-Generates server-side PNG chart images from analysis results,
-matching the frontend AccelAnalysisChart visuals.  Used to cache
-visual output for export/sharing without re-rendering client-side.
+Graph maker
 """
 
 import os
@@ -26,14 +22,6 @@ _REP_SHADE_COLORS = [
 
 
 def generate_chart_image(analysis: dict, output_path: str) -> str:
-    """
-    Generate a PNG chart image from analysis results and save to *output_path*.
-
-    Produces a 3-panel figure (acceleration, velocity, position) with
-    rep-boundary shading.
-
-    Returns the absolute path of the written file.
-    """
     chart = analysis["chart"]
     boundaries = analysis["rep_boundaries"]
     total_samples = analysis["total_samples"]

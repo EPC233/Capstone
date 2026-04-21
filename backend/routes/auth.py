@@ -14,8 +14,8 @@ Routes:
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
 
 from auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -221,10 +221,11 @@ async def search_users(
 ):
     if not q or len(q) < 2:
         return []
-    
+
+    safe_q = q.replace("%", "\\%").replace("_", "\\_")
     result = await db.execute(
         select(User)
-        .where(User.username.ilike(f"%{q}%"))
+        .where(User.username.ilike(f"%{safe_q}%"))
         .where(User.id != current_user.id)
         .limit(20)
     )

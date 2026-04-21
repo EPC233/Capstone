@@ -1,5 +1,5 @@
 """
-RepDetail model — stores per-rep analysis results for a set.
+RepDetail model - stores per-rep analysis results for a set.
 """
 
 from datetime import datetime

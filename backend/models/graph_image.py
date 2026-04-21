@@ -1,5 +1,5 @@
 """
-GraphImage model — represents a graph image associated with a session.
+GraphImage model - represents a graph image associated with a session.
 """
 
 from datetime import datetime

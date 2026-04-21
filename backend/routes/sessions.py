@@ -2,29 +2,30 @@
 Session API endpoints for managing sessions, sets, and data analysis.
 
 Routes:
-    ---- Session management ----
+    __________ Session management __________
     POST / - Create a new session
     GET / - Get all sessions for current user
     GET /{session_id} - Get a specific session by ID
     PUT /{session_id} - Update a session
     DELETE /{session_id} - Delete a session
     
-    ---- Set management ----
+    __________ Set management __________
     POST /{session_id}/sets - Create a new set within a session
     PATCH /sets/{set_id} - Update a set's properties (name, description, weight, status)
     DELETE /sets/{set_id} - Delete a set and its accelerometer data
     
-    ---- Accelerometer data management and analysis ----
+    __________ Accelerometer data management and analysis __________
     POST /sets/{set_id}/accelerometer - Upload accelerometer CSV data for a set
     GET /accelerometer/{data_id}/analyze - Analyze accelerometer data and generate rep details
     DELETE /accelerometer/{data_id} - Delete accelerometer data
     
-    ---- Graph image management ----
+    __________ Graph image management __________
     POST /{session_id}/graph - Upload a graph/chart image to a session
     DELETE /graph/{image_id} - Delete a graph image
 """
 
 import os
+import re
 from typing import List
 from datetime import datetime
 
@@ -72,7 +73,6 @@ async def create_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Create a new session for the current user."""
     session = Session(
         user_id=current_user.id,
         name=session_data.name,
@@ -129,7 +129,6 @@ async def update_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Update a session."""
     result = await db.execute(
         select(Session)
         .where(Session.id == session_id, Session.user_id == current_user.id)
@@ -224,7 +223,6 @@ async def update_set(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Update a set's name, description, weight, or status."""
     result = await db.execute(
         select(Set)
         .join(Session)
@@ -259,7 +257,6 @@ async def delete_set(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete a set and its accelerometer data."""
     result = await db.execute(
         select(Set)
         .join(Session)
@@ -370,7 +367,6 @@ async def analyze_accelerometer_data(
 
     recording_duration: float | None = None
     if data.description:
-        import re
 
         m = re.search(r"([\d.]+)s\s*$", data.description)
         if m:
@@ -408,7 +404,6 @@ async def analyze_accelerometer_data(
     for rd in existing:
         await db.delete(rd)
 
-    # Insert new rep details
     for rep in analysis.get("reps", []):
         ecc = rep.get("eccentric")
         con = rep.get("concentric")

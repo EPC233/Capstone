@@ -1,5 +1,5 @@
 """
-Session model — represents a workout session, which can contain multiple sets and associated graph images.
+Session model - represents a workout session, which can contain multiple sets and associated graph images.
 """
 
 from datetime import datetime

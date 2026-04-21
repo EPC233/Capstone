@@ -1,5 +1,5 @@
 """
-AccelerometerData model — represents accelerometer data associated with a set (stored as a csv).
+AccelerometerData model - represents accelerometer data associated with a set (stored as a csv).
 """
 
 from datetime import datetime

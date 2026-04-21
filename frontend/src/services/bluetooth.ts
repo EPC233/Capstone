@@ -24,6 +24,54 @@ let device: BluetoothDevice | null = null;
 let characteristic: BluetoothRemoteGATTCharacteristic | null = null;
 let sampleIndex = 0;
 
+function handleGattServerDisconnected() {
+    characteristic = null;
+    recording = false;
+    notifyStatus();
+}
+
+async function connectGattServer(
+    targetDevice: BluetoothDevice,
+): Promise<BluetoothRemoteGATTServer> {
+    if (!targetDevice.gatt) {
+        throw new Error('GATT server not available on device');
+    }
+    if (targetDevice.gatt.connected) {
+        return targetDevice.gatt;
+    }
+    return targetDevice.gatt.connect();
+}
+
+async function discoverCharacteristicWithReconnect(
+    targetDevice: BluetoothDevice,
+): Promise<BluetoothRemoteGATTCharacteristic> {
+    const discover = async () => {
+        const server = await connectGattServer(targetDevice);
+        const service = await server.getPrimaryService(IMU_SERVICE_UUID);
+        return service.getCharacteristic(IMU_CHARACTERISTIC_UUID);
+    };
+
+    try {
+        return await discover();
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const disconnectedError = /gatt server is disconnected|not connected|cannot retrieve services/i.test(
+            message,
+        );
+
+        if (!disconnectedError) {
+            throw error;
+        }
+
+        // One retry handles transient disconnects between connect and service discovery.
+        if (targetDevice.gatt?.connected) {
+            targetDevice.gatt.disconnect();
+        }
+
+        return discover();
+    }
+}
+
 // Recording state
 let recording = false;
 let recordingSamples = 0;
@@ -195,20 +243,11 @@ export async function connectBle(): Promise<{ status: string; port?: string }> {
         filters: [{ services: [IMU_SERVICE_UUID] }],
     });
 
-    if (!device.gatt) {
-        throw new Error('GATT server not available on device');
-    }
+    // Listen for unexpected disconnects (de-duplicate on reconnects).
+    device.removeEventListener('gattserverdisconnected', handleGattServerDisconnected);
+    device.addEventListener('gattserverdisconnected', handleGattServerDisconnected);
 
-    // Listen for unexpected disconnects
-    device.addEventListener('gattserverdisconnected', () => {
-        characteristic = null;
-        recording = false;
-        notifyStatus();
-    });
-
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(IMU_SERVICE_UUID);
-    characteristic = await service.getCharacteristic(IMU_CHARACTERISTIC_UUID);
+    characteristic = await discoverCharacteristicWithReconnect(device);
 
     // Subscribe to IMU data notifications
     await characteristic.startNotifications();

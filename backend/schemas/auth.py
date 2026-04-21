@@ -3,18 +3,18 @@ Schemas for user authentication and profile management. Kinda deprecated since t
 allows for multiple users on the same instance which is cool.
 
 Schemas:
-    ---- User schemas ----
+    __________ User schemas __________
     UserBase - Base schema for user data
     UserCreate - Create/Register a new user
     UserLogin - User login credentials
     UserResponse - User data returned to the client
     UserProfileUpdate - Update user profile fields
 
-    ---- Token schemas ----
+    __________ Token schemas __________
     Token - JWT token response
     TokenData - Decoded token
 
-    ---- Password reset schemas ----
+    __________ Password reset schemas __________
     PasswordResetRequest - Request a password reset email
     PasswordResetForm - Submit a new password with reset token
 """
