@@ -1,5 +1,11 @@
 import { defineConfig } from "vite";
 
+const runningInDocker = process.env.DOCKER_ENV === "true";
+const defaultProxyTarget = runningInDocker
+    ? "http://host.docker.internal:8000"
+    : "http://localhost:8000";
+const proxyTarget = process.env.VITE_PROXY_TARGET || defaultProxyTarget;
+
 // https://vitejs.dev/config/
 export default defineConfig({
     server: {

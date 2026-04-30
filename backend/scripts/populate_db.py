@@ -1,3 +1,7 @@
+"""
+Vibe coded db population script.
+"""
+
 import asyncio
 import os
 import sys

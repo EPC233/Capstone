@@ -2,11 +2,11 @@
 Schemas for set data and responses. Important file!
 
 Schemas:
-    ---- Request schemas ----
+    __________ Request schemas __________
     SetCreate - Create a new set
     SetUpdate - Update a set
 
-    ---- Response schemas ----
+    __________ Response schemas __________
     AccelerometerDataInSet - The actual data file info nested inside a set response
     PhaseDetail - Eccentric/concentric phase metrics for a rep
     RepDetailResponse - Single rep with nested per-phase details
@@ -56,7 +56,6 @@ class PhaseDetail(BaseModel):
     avg_accel: float
     avg_watts: Optional[float] = None
 
-""" Used in file session.py to avoid circular imports """
 class RepDetailResponse(BaseModel):
     id: int
     set_id: int
@@ -79,9 +78,7 @@ class RepDetailResponse(BaseModel):
         from_attributes = True
 
     """ 
-    This converts the ORM model to the response model, including nested phase details.
-    Definitely makes things easier to work with I promise! Its alot of mapping, bit 
-    it keeps all of that bs in the same place and out of session.py - which is already a monster of a file.
+    This converts the ORM model to the response model, including nested phase details - cleans up session.py.
     """
     @classmethod
     def from_orm_model(cls, obj: "RepDetailResponse") -> "RepDetailResponse":

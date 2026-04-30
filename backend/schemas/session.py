@@ -2,11 +2,11 @@
 Schemas for session-related data stuffs.
 
 Schemas:
-    ---- Graph image schemas ----
+    __________ Graph image schemas __________
     GraphImageBase - Base graph image fields
     GraphImageResponse - Graph image response
 
-    ---- Session schemas ----
+    __________ Session schemas __________
     SessionBase - Base session fields
     SessionCreate - Create a new session
     SessionUpdate - Update a session

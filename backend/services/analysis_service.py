@@ -1,3 +1,7 @@
+"""
+Used to format output of ccsv_analyzer
+"""
+
 from dataclasses import dataclass, field
 
 COLUMNS = [

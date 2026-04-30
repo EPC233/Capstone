@@ -2,13 +2,13 @@
 Serial port routes for Arduino and data mangement.
 
 Routes:
-    ---- Serial connection routes ----
+    __________ Serial connection routes __________
     GET /serial/ports - List serial ports
     GET /serial/status - Get current connection and recording status
     POST /serial/connect - Connect to Arduino
     POST /serial/disconnect - Disconnect from Arduino
     
-    ---- Serial recording routes ----
+    __________ Serial recording routes __________
     POST /serial/record/start - Start recording serial data
     POST /serial/record/stop - Stop recording (if session_id save to session, set_id to overwrite specific set)
     POST /serial/record/upload - Upload csv to session - deprecated as of now

@@ -1,5 +1,5 @@
 """
-Set model — represents a single set within a workout session.
+Set model - represents a single set within a workout session.
 """
 
 from datetime import datetime
