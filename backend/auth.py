@@ -26,28 +26,21 @@ optional_bearer = HTTPBearer(auto_error=False)
 
 
 def _prehash_password(password: str) -> bytes:
-    """
-    Pre-hash password with SHA256 to handle bcrypt's 72-byte limit.
-    Returns 32-byte binary digest (well under bcrypt's limit).
-    """
     return hashlib.sha256(password.encode("utf-8")).digest()
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password using SHA256 + bcrypt"""
     prehashed = _prehash_password(password)
     hashed = bcrypt.hashpw(prehashed, bcrypt.gensalt(rounds=BCRYPT_ROUNDS))
     return hashed.decode("utf-8")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash"""
     prehashed = _prehash_password(plain_password)
     return bcrypt.checkpw(prehashed, hashed_password.encode("utf-8"))
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -58,19 +51,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 def create_verification_token(user_id: int, email: str) -> str:
-    """Create an email verification token"""
     data = {
         "user_id": user_id,
         "email": email,
         "type": "email_verification",
     }
-    # Verification tokens expire in 24 hours
     expires_delta = timedelta(hours=24)
     return create_access_token(data, expires_delta=expires_delta)
 
 
 def verify_verification_token(token: str) -> Optional[dict]:
-    """Verify an email verification token and return the payload"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "email_verification":
@@ -81,19 +71,16 @@ def verify_verification_token(token: str) -> Optional[dict]:
 
 
 def create_password_reset_token(user_id: int, email: str) -> str:
-    """Create a password reset token"""
     data = {
         "user_id": user_id,
         "email": email,
         "type": "password_reset",
     }
-    # Password reset tokens expire in 1 hour
     expires_delta = timedelta(hours=1)
     return create_access_token(data, expires_delta=expires_delta)
 
 
 def verify_password_reset_token(token: str) -> Optional[dict]:
-    """Verify a password reset token and return the payload"""
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "password_reset":
@@ -104,19 +91,16 @@ def verify_password_reset_token(token: str) -> Optional[dict]:
 
 
 async def get_user_by_username(username: str, db: AsyncSession) -> Optional[User]:
-    """Get a user by username"""
     result = await db.execute(select(User).where(User.username == username))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
-    """Get a user by email"""
     result = await db.execute(select(User).where(User.email == email))
     return result.scalar_one_or_none()
 
 
 async def get_user_by_id(user_id: int, db: AsyncSession) -> Optional[User]:
-    """Get a user by ID"""
     result = await db.execute(select(User).where(User.id == user_id))
     return result.scalar_one_or_none()
 
@@ -124,7 +108,6 @@ async def get_user_by_id(user_id: int, db: AsyncSession) -> Optional[User]:
 async def authenticate_user(
     username: str, password: str, db: AsyncSession
 ) -> Optional[User]:
-    """Authenticate a user by username and password"""
     user = await get_user_by_username(username, db)
     if not user or not verify_password(password, user.hashed_password):
         return None
@@ -134,7 +117,6 @@ async def authenticate_user(
 async def get_bearer_token(
     credentials: HTTPAuthorizationCredentials = Security(security_scheme),
 ) -> str:
-    """Extract Bearer token from Authorization header"""
     return credentials.credentials
 
 
@@ -142,9 +124,6 @@ async def get_current_user(
     token: str = Depends(get_bearer_token),
     db: AsyncSession = Depends(get_db),
 ) -> User:
-    """
-    Get the current authenticated user from JWT token.
-    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -157,7 +136,6 @@ async def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    # Load user
     result = await db.execute(select(User).where(User.username == username))
     authenticated_user = result.scalar_one_or_none()
     if authenticated_user is None:
@@ -169,7 +147,6 @@ async def get_current_user(
 async def get_bearer_token_optional(
     credentials: HTTPAuthorizationCredentials | None = Security(optional_bearer),
 ) -> str | None:
-    """Extract Bearer token from Authorization header if present."""
     if credentials is None:
         return None
     return credentials.credentials
@@ -179,10 +156,6 @@ async def get_current_user_optional(
     token: str | None = Depends(get_bearer_token_optional),
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
-    """
-    Get the current user from JWT if present and valid; otherwise None.
-    Use for endpoints that work both authenticated and anonymous (e.g. register).
-    """
     if token is None:
         return None
 

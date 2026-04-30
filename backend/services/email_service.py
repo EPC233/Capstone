@@ -1,5 +1,5 @@
 """
-Email sending service using SMTP.
+Email sending service using SMTP. Not currently being used.
 
 Configure via environment variables:
     SMTP_HOST      - SMTP server hostname (default: smtp.gmail.com)

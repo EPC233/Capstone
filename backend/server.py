@@ -12,7 +12,6 @@ from fastapi.staticfiles import StaticFiles
 
 from database import engine
 
-# Import models to ensure they're registered with Base.metadata for table creation
 from models import (  # noqa: F401
     AccelerometerData,
     Base,
@@ -31,17 +30,13 @@ from routes import (
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifespan context manager for startup and shutdown events"""
-    # Startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     print("✅ Database tables created successfully")
     yield
-    # Shutdown (if needed)
 
 
-# Create the FastAPI app with lifespan
 app = FastAPI(
     title="Fitness Tracker API",
     description="API for fitness tracking and accelerometer data management",
@@ -49,7 +44,6 @@ app = FastAPI(
 )
 
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -58,12 +52,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routers
 app.include_router(auth.router, prefix="/api")
 app.include_router(sessions.router, prefix="/api")
 app.include_router(serial.router, prefix="/api")
 
-# Serve static files (production)
 static_dir = os.path.join(os.path.dirname(__file__), "..", "static")
 if os.path.exists(static_dir):
     app.mount(
@@ -72,7 +64,6 @@ if os.path.exists(static_dir):
         name="assets",
     )
 
-# Serve uploaded files
 uploads_dir = os.path.join(os.path.dirname(__file__), "uploads")
 if os.path.exists(uploads_dir):
     app.mount(
@@ -81,7 +72,6 @@ if os.path.exists(uploads_dir):
         name="uploads",
     )
 
-# SPA routing (serve index.html for non-API routes)
 if os.path.exists(static_dir):
     API_ROUTE_PREFIXES = ["/api", "/docs", "/openapi.json"]
 

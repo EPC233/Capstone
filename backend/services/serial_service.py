@@ -16,12 +16,10 @@ try:
     import serial.tools.list_ports
     PYSERIAL_AVAILABLE = True
 except ImportError:
-    serial = None  # type: ignore[assignment]
+    serial = None
     PYSERIAL_AVAILABLE = False
 
 
-# Column names from the GravityCorrectedAccel sketch
-# New format includes timestamp_us as the first column
 COLUMNS_WITH_TS = [
     "timestamp_us",
     "ax", "ay", "az",
@@ -35,13 +33,11 @@ COLUMNS_NO_TS = [
     "qw", "qx", "qy", "qz",
     "ax_world", "ay_world", "az_world",
 ]
-# Accept either 13 or 14 columns
 EXPECTED_COLS_NO_TS = len(COLUMNS_NO_TS)
 EXPECTED_COLS_WITH_TS = len(COLUMNS_WITH_TS)
 
 
 def find_arduino_port() -> Optional[str]:
-    """Auto-detect the first available Arduino serial port."""
     if not PYSERIAL_AVAILABLE:
         return None
     for port in serial.tools.list_ports.comports():
@@ -51,7 +47,6 @@ def find_arduino_port() -> Optional[str]:
 
 
 def list_serial_ports() -> list[dict]:
-    """Return a list of available serial ports with metadata."""
     if not PYSERIAL_AVAILABLE:
         return []
     ports = []
@@ -68,17 +63,62 @@ def list_serial_ports() -> list[dict]:
     return ports
 
 
+def parse_data_line(line: str) -> Optional[tuple[list[str], list[float]]]:
+    parts = line.split(",")
+    if len(parts) not in (EXPECTED_COLS_NO_TS, EXPECTED_COLS_WITH_TS):
+        return None
+    try:
+        values = [float(p) for p in parts]
+    except ValueError:
+        return None
+    cols = COLUMNS_WITH_TS if len(parts) == EXPECTED_COLS_WITH_TS else COLUMNS_NO_TS
+    return cols, values
+
+
+def is_header_line(line: str) -> bool:
+    return "ax" in line and "az_world" in line
+
+
+def build_data_message(cols: list[str], values: list[float], sample_index: int) -> str:
+    data_point = dict(zip(cols, values))
+    data_point["index"] = sample_index
+    data_point["timestamp"] = time.time()
+    return json.dumps(data_point)
+
+
+def build_csv_content(lines: list[str]) -> str:
+    has_timestamps = False
+    if lines:
+        first_parts = lines[0].split(",")
+        has_timestamps = len(first_parts) == EXPECTED_COLS_WITH_TS
+
+    cols = COLUMNS_WITH_TS if has_timestamps else COLUMNS_NO_TS
+    csv_header = ",".join(cols)
+    csv_body = "\n".join(lines)
+    return csv_header + "\n" + csv_body + "\n"
+
+
+def push_to_queue(queue: asyncio.Queue, message: str) -> bool:
+    try:
+        queue.put_nowait(message)
+        return True
+    except asyncio.QueueFull:
+        try:
+            queue.get_nowait()
+            queue.put_nowait(message)
+            return True
+        except asyncio.QueueEmpty:
+            return False
+
+
 @dataclass
 class RecordingBuffer:
-    """Holds data collected during a recording session."""
     lines: list[str] = field(default_factory=list)
     start_time: float = 0.0
     sample_count: int = 0
 
 
 class SerialService:
-    """Singleton service managing the Arduino serial connection."""
-
     def __init__(self) -> None:
         self._serial: Optional[serial.Serial] = None
         self._connected = False
@@ -110,9 +150,11 @@ class SerialService:
         return 0
 
     async def connect(self, port: Optional[str] = None, baud: int = 115200) -> dict:
-        """Open a serial connection to the Arduino."""
         if not PYSERIAL_AVAILABLE:
-            return {"status": "error", "detail": "pyserial is not installed on this server. Install it with: pip install pyserial"}
+            return {
+                "status": "error",
+                "detail": "pyserial is not installed on this server. Install it with: pip install pyserial",
+            }
 
         async with self._lock:
             if self.is_connected:
@@ -122,51 +164,53 @@ class SerialService:
             if target_port is None:
                 return {"status": "error", "detail": "No Arduino port found. Is the device connected?"}
 
-            try:
-                self._serial = serial.Serial(target_port, baud, timeout=0.1)
-                self._serial.reset_input_buffer()
-                self._port = target_port
-                self._baud = baud
-                self._connected = True
-                self._running = True
+            return await self._open_serial(target_port, baud)
 
-                # Wait a moment for the Arduino to reset
-                await asyncio.sleep(2)
+    async def _open_serial(self, target_port: str, baud: int) -> dict:
+        try:
+            self._serial = serial.Serial(target_port, baud, timeout=0.1)
+            self._serial.reset_input_buffer()
+            self._port = target_port
+            self._baud = baud
+            self._connected = True
+            self._running = True
 
-                # Skip the header line if present
-                await self._skip_header()
+            await asyncio.sleep(2)
+            await self._skip_header()
 
-                # Start the background reader
-                self._read_task = asyncio.create_task(self._read_loop())
-
-                return {"status": "connected", "port": target_port}
-            except serial.SerialException as exc:
-                self._connected = False
-                return {"status": "error", "detail": str(exc)}
+            self._read_task = asyncio.create_task(self._read_loop())
+            return {"status": "connected", "port": target_port}
+        except serial.SerialException as exc:
+            self._connected = False
+            return {"status": "error", "detail": str(exc)}
 
     async def disconnect(self) -> dict:
-        """Close the serial connection."""
         async with self._lock:
             if self._recording:
                 self._recording = False
 
-            self._running = False
-            if self._read_task:
-                self._read_task.cancel()
-                try:
-                    await self._read_task
-                except asyncio.CancelledError:
-                    pass
-                self._read_task = None
+            await self._stop_read_task()
+            self._close_serial()
 
-            if self._serial and self._serial.is_open:
-                self._serial.close()
-
-            self._serial = None
-            self._connected = False
             port = self._port
             self._port = None
             return {"status": "disconnected", "port": port}
+
+    async def _stop_read_task(self) -> None:
+        self._running = False
+        if self._read_task:
+            self._read_task.cancel()
+            try:
+                await self._read_task
+            except asyncio.CancelledError:
+                pass
+            self._read_task = None
+
+    def _close_serial(self) -> None:
+        if self._serial and self._serial.is_open:
+            self._serial.close()
+        self._serial = None
+        self._connected = False
 
     async def start_recording(self) -> dict:
         if not self.is_connected:
@@ -174,29 +218,31 @@ class SerialService:
         if self._recording:
             return {"status": "error", "detail": "Already recording"}
 
+        self._begin_recording()
+        return {"status": "recording_started"}
+
+    def _begin_recording(self) -> None:
         self._recording_buffer = RecordingBuffer(start_time=time.time())
         self._recording = True
-        return {"status": "recording_started"}
+
+    def _end_recording(self) -> Optional[RecordingBuffer]:
+        if self._recording_buffer is None:
+            return None
+        self._recording = False
+        buffer = self._recording_buffer
+        self._recording_buffer = None
+        return buffer
 
     async def stop_recording(self) -> dict:
         if not self._recording or self._recording_buffer is None:
             return {"status": "error", "detail": "Not recording"}
 
-        self._recording = False
-        buffer = self._recording_buffer
-        self._recording_buffer = None
+        buffer = self._end_recording()
+        if buffer is None:
+            return {"status": "error", "detail": "Not recording"}
 
         duration = time.time() - buffer.start_time
-        # Detect column format: first line tells us if timestamps are present
-        has_timestamps = False
-        if buffer.lines:
-            first_parts = buffer.lines[0].split(",")
-            has_timestamps = len(first_parts) == EXPECTED_COLS_WITH_TS
-
-        cols = COLUMNS_WITH_TS if has_timestamps else COLUMNS_NO_TS
-        csv_header = ",".join(cols)
-        csv_body = "\n".join(buffer.lines)
-        csv_content = csv_header + "\n" + csv_body + "\n"
+        csv_content = build_csv_content(buffer.lines)
 
         return {
             "status": "recording_stopped",
@@ -206,7 +252,6 @@ class SerialService:
         }
 
     def subscribe(self) -> asyncio.Queue:
-        """Create a new subscriber queue for live data."""
         queue: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._subscribers.add(queue)
         return queue
@@ -214,110 +259,86 @@ class SerialService:
     def unsubscribe(self, queue: asyncio.Queue) -> None:
         self._subscribers.discard(queue)
 
-    def _broadcast_control(self, event: str) -> None:
-        """Send a control event (e.g. record_start, record_stop) to all WS subscribers."""
-        message = json.dumps({"type": "control", "event": event})
+    def _broadcast(self, message: str) -> None:
+        dead_queues = []
         for queue in self._subscribers:
-            try:
-                queue.put_nowait(message)
-            except asyncio.QueueFull:
-                try:
-                    queue.get_nowait()
-                    queue.put_nowait(message)
-                except asyncio.QueueEmpty:
-                    pass
+            if not push_to_queue(queue, message):
+                dead_queues.append(queue)
+        for q in dead_queues:
+            self._subscribers.discard(q)
+
+    def _broadcast_control(self, event: str) -> None:
+        self._broadcast(json.dumps({"type": "control", "event": event}))
+
+    def _handle_control_line(self, line: str) -> bool:
+        if line == "RECORD_START":
+            if not self._recording:
+                self._begin_recording()
+            self._broadcast_control("record_start")
+            return True
+        if line == "RECORD_STOP":
+            if self._recording:
+                self._recording = False
+            self._broadcast_control("record_stop")
+            return True
+        if line == "TARE":
+            self._broadcast_control("tare")
+            return True
+        return False
+
+    def _record_line(self, line: str) -> None:
+        if self._recording and self._recording_buffer is not None:
+            self._recording_buffer.lines.append(line)
+            self._recording_buffer.sample_count += 1
 
     async def _skip_header(self) -> None:
-        """Read and discard lines until we get valid numeric data."""
         if not self._serial:
             return
         loop = asyncio.get_event_loop()
         for _ in range(50):
             raw = await loop.run_in_executor(None, self._serial.readline)
             line = raw.decode(errors="replace").strip()
-            parts = line.split(",")
-            if len(parts) in (EXPECTED_COLS_NO_TS, EXPECTED_COLS_WITH_TS):
-                try:
-                    [float(p) for p in parts]
-                    return  # Got valid data, header is past
-                except ValueError:
-                    continue
-            if "ax" in line and "az_world" in line:
-                return  # Found the header line itself
+            if parse_data_line(line) is not None:
+                return
+            if is_header_line(line):
+                return
+
+    async def _read_serial_line(self) -> Optional[str]:
+        if not self._serial:
+            return None
+        loop = asyncio.get_event_loop()
+        raw = await loop.run_in_executor(None, self._serial.readline)
+        if not raw:
+            return None
+        return raw.decode(errors="replace").strip()
 
     async def _read_loop(self) -> None:
-        """Continuously read from serial and broadcast to subscribers."""
-        loop = asyncio.get_event_loop()
         sample_index = 0
 
         while self._running and self._serial and self._serial.is_open:
             try:
-                raw = await loop.run_in_executor(None, self._serial.readline)
-                if not raw:
+                line = await self._read_serial_line()
+                if line is None:
                     continue
 
-                line = raw.decode(errors="replace").strip()
-                parts = line.split(",")
-
-                # Detect button-triggered recording commands
-                if line == "RECORD_START":
-                    if not self._recording:
-                        self._recording_buffer = RecordingBuffer(start_time=time.time())
-                        self._recording = True
-                    self._broadcast_control("record_start")
-                    continue
-                if line == "RECORD_STOP":
-                    if self._recording:
-                        self._recording = False
-                    self._broadcast_control("record_stop")
-                    continue
-                if line == "TARE":
-                    self._broadcast_control("tare")
+                if self._handle_control_line(line):
                     continue
 
-                if len(parts) not in (EXPECTED_COLS_NO_TS, EXPECTED_COLS_WITH_TS):
+                parsed = parse_data_line(line)
+                if parsed is None:
                     continue
 
-                try:
-                    values = [float(p) for p in parts]
-                except ValueError:
-                    continue
-
-                # Build a JSON message (use appropriate column list)
-                cols = COLUMNS_WITH_TS if len(parts) == EXPECTED_COLS_WITH_TS else COLUMNS_NO_TS
-                data_point = dict(zip(cols, values))
-                data_point["index"] = sample_index
-                data_point["timestamp"] = time.time()
+                cols, values = parsed
+                message = build_data_message(cols, values, sample_index)
                 sample_index += 1
 
-                message = json.dumps(data_point)
-
-                # Record if active
-                if self._recording and self._recording_buffer is not None:
-                    self._recording_buffer.lines.append(line)
-                    self._recording_buffer.sample_count += 1
-
-                # Broadcast to all WebSocket subscribers
-                dead_queues = []
-                for queue in self._subscribers:
-                    try:
-                        queue.put_nowait(message)
-                    except asyncio.QueueFull:
-                        # Drop oldest item and add new one
-                        try:
-                            queue.get_nowait()
-                            queue.put_nowait(message)
-                        except asyncio.QueueEmpty:
-                            dead_queues.append(queue)
-
-                for q in dead_queues:
-                    self._subscribers.discard(q)
+                self._record_line(line)
+                self._broadcast(message)
 
             except asyncio.CancelledError:
                 break
             except Exception as exc:
                 if PYSERIAL_AVAILABLE and isinstance(exc, serial.SerialException):
-                    # Device disconnected
                     self._connected = False
                     self._running = False
                     break
@@ -325,5 +346,4 @@ class SerialService:
                 await asyncio.sleep(0.1)
 
 
-# Module-level singleton
 serial_service = SerialService()
