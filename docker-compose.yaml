@@ -49,7 +49,6 @@ services:
     environment:
       - DOCKER_ENV=true
       - VITE_API_URL=
-      - VITE_PROXY_TARGET=http://host.docker.internal:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

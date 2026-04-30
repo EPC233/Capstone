@@ -14,8 +14,37 @@ BACKEND_DIR="$SCRIPT_DIR/backend"
 # Database URL rewritten for host access
 LOCAL_DB_URL="postgresql+asyncpg://postgres:postgres@localhost:5433/fitness_tracker_db"
 
+# ngrok tunnel config
+NGROK_DOMAIN="saggy-preppy-expiring.ngrok-free.dev"
+NGROK_PORT="5173"
+NGROK_LOG="/tmp/capstone-ngrok.log"
+NGROK_PID=""
+
 port_listener_pid() {
     lsof -iTCP:8000 -sTCP:LISTEN -t 2>/dev/null | head -1 || true
+}
+
+kill_existing_ngrok() {
+    pkill -f "ngrok http.*${NGROK_DOMAIN}" 2>/dev/null || true
+}
+
+start_ngrok() {
+    if ! command -v ngrok &>/dev/null; then
+        echo "⚠️  ngrok not installed — skipping tunnel"
+        return
+    fi
+    kill_existing_ngrok
+    echo "🌐 Starting ngrok tunnel https://${NGROK_DOMAIN} -> localhost:${NGROK_PORT}"
+    nohup ngrok http --url="${NGROK_DOMAIN}" "${NGROK_PORT}" --log=stdout >"${NGROK_LOG}" 2>&1 &
+    NGROK_PID=$!
+    disown "$NGROK_PID" 2>/dev/null || true
+}
+
+stop_ngrok() {
+    if [[ -n "$NGROK_PID" ]] && kill -0 "$NGROK_PID" 2>/dev/null; then
+        kill "$NGROK_PID" 2>/dev/null || true
+    fi
+    kill_existing_ngrok
 }
 
 kill_and_wait() {
@@ -40,6 +69,9 @@ if [[ "${1:-}" == "--restore" ]]; then
         echo "   Stopping local backend (PID $LISTEN_PID)..."
         kill_and_wait "$LISTEN_PID"
     fi
+
+    echo "   Stopping ngrok tunnel..."
+    kill_existing_ngrok
 
     docker compose -f "$COMPOSE_FILE" up -d backend frontend
     echo "Docker backend and frontend are running again."
@@ -124,6 +156,9 @@ fi
 export DATABASE_URL="$LOCAL_DB_URL"
 export PYTHONPATH="$BACKEND_DIR${PYTHONPATH:+:$PYTHONPATH}"
 set +a
+
+start_ngrok
+trap stop_ngrok EXIT INT TERM
 
 cd "$BACKEND_DIR"
 exec poetry run uvicorn server:app --host 0.0.0.0 --port 8000 --reload

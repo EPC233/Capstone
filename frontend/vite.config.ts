@@ -22,11 +22,11 @@ export default defineConfig({
         },
         proxy: {
             "/api": {
-                target: proxyTarget,
+                target: "http://host.docker.internal:8000",
                 changeOrigin: true,
             },
             "/uploads": {
-                target: proxyTarget,
+                target: "http://host.docker.internal:8000",
                 changeOrigin: true,
             },
         },
