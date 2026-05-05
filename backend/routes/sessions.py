@@ -215,7 +215,6 @@ async def create_set(
     )
     return result.scalars().unique().one()
 
-
 @router.patch("/sets/{set_id}", response_model=SetResponse)
 async def update_set(
     set_id: int,
@@ -250,7 +249,7 @@ async def update_set(
     )
     return result.scalars().unique().one()
 
-
+# Delete a set and its accelerometer data. Returns 204 on success.
 @router.delete("/sets/{set_id}", status_code=204)
 async def delete_set(
     set_id: int,
@@ -275,7 +274,7 @@ async def delete_set(
     return None
 
 
-
+# Upload accelerometer CSV file for a set, replacing existing file if present. Marks set as complete. Returns updated set with new accelerometer data.
 @router.post("/sets/{set_id}/accelerometer", response_model=SetResponse, status_code=201)
 async def upload_accelerometer_data(
     set_id: int,
@@ -333,7 +332,7 @@ async def upload_accelerometer_data(
     )
     return result.scalars().unique().one()
 
-
+# Analyzes accelerometer CSV file for a set and stores rep details in the database. Returns the analysis results.
 @router.get("/accelerometer/{data_id}/analyze")
 async def analyze_accelerometer_data(
     data_id: int,
@@ -473,7 +472,6 @@ async def analyze_accelerometer_data(
 
     return analysis
 
-
 @router.delete("/accelerometer/{data_id}", status_code=204)
 async def delete_accelerometer_data(
     data_id: int,
@@ -508,7 +506,7 @@ async def delete_accelerometer_data(
     await db.commit()
     return None
 
-
+# Currently not being used by frontend, maybe add later if storing the images becomes a problem
 @router.post("/{session_id}/graph", response_model=GraphImageResponse, status_code=201)
 async def upload_graph_image(
     session_id: int,
@@ -554,7 +552,7 @@ async def upload_graph_image(
     await db.refresh(graph_image)
     return graph_image
 
-
+# Currently not being used by frontend, maybe add later if storing the images becomes a problem
 @router.delete("/graph/{image_id}", status_code=204)
 async def delete_graph_image(
     image_id: int,
